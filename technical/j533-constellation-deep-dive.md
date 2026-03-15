@@ -1,0 +1,437 @@
+# J533 Gateway Deep Dive: Constellation Process and Part Number Reference
+
+*The most technically detailed document in this repository. Based on hardware teardown research, community reverse engineering, and publicly available documentation.*
+
+---
+
+## The J533 is Two Systems in One
+
+The critical discovery that changes everything about understanding CP:
+
+**The Lear gateway on your C7 A6 contains two completely separate storage systems:**
+
+1. **External EEPROM (95320)** — SPI chip, 32Kbit — stores coding, adaptation, bus topology config, some CP-adjacent data
+2. **Internal NEC/Renesas D70F3433(A) Microcontroller flash** — 16-bit MCU — stores the actual Component Protection constellation data
+
+Community hardware research confirmed this explicitly:
+> *"Component Protection data are stored on D70F3433(A) 16-bit Microcontroller. Cloning the ATMEL EEPROM only suppressed the CP fault — it did NOT permanently fix it."*
+
+This is why the EEPROM-only approach from older tools is unreliable on the Lear platform. The EEPROM clone tricks the module into not displaying CP faults, but the actual cryptographic constellation lives in the MCU flash. The MCU is what actually enforces the check.
+
+---
+
+## The J533 Hardware Architecture (C7 Platform — Lear Gateway)
+
+Based on community teardowns of the 8T0-series Lear gateway (same architecture as your 4G0-series):
+
+### Primary Chip: NEC/Renesas D70F3433(A)
+
+| Parameter | Value |
+|---|---|
+| Manufacturer | NEC Electronics / Renesas |
+| Series | V850E/PH3 (16-bit RISC) |
+| Variant | D70F3433(A) |
+| Architecture | V850 core |
+| Flash | Internal — contains the CP constellation data |
+| Interface | V850 Fetch Bus (VFB) |
+| Programmer required | CarProTool or similar V850 programmer |
+
+**What lives in the MCU flash:**
+- The CP constellation table — serial numbers of all enrolled modules
+- Cryptographic binding keys for each CP-protected module
+- VIN association data
+- The CP state flags (active/inactive per module)
+- Bus topology routing configuration
+- Firmware (the gateway operating software itself)
+
+**Why this matters:** When ODIS runs CP removal, it writes new constellation data to this MCU flash via a secure, server-authenticated UDS routine. The EEPROM is essentially config storage; the MCU is the security brain.
+
+### Secondary Chip: External EEPROM
+
+| Platform | Chip | Size | Interface |
+|---|---|---|---|
+| Temic gateway (A4 B7, A6 C6 early) | Atmel 25640AN | 64Kbit | SPI |
+| Lear gateway (A6 C7, A7, A8 D4) | ST/Atmel 95320 | 32Kbit | SPI |
+
+**What lives in the EEPROM on the Lear gateway:**
+- Gateway coding (the long hex string you see in VCDS)
+- Adaptation channel values
+- Bus topology: which modules are expected on which sub-bus
+- Energy management configuration
+- Some CP-adjacent module presence data (but NOT the cryptographic constellation)
+- The VCID (Vehicle Component Identification string)
+
+**The EEPROM clone trick:** When you clone the EEPROM from a matching gateway, J533 loads configuration that matches the expected module list — so it stops flagging CP because the external config says "these modules are fine." But the MCU still has the original cryptographic data, so the security is only superficially bypassed. This is why the community notes it "suppresses but doesn't fix" CP.
+
+### Supporting Chips (Temic/early Lear, documented)
+
+| Chip | Function | Relevance to CP |
+|---|---|---|
+| TLE6250G (Infineon) | High-speed CAN transceiver | Physical CAN interface |
+| TJA1041AT (NXP) | High-speed CAN with standby | Powertrain/Extended CAN |
+| TJA1055T/c (NXP) | Fault-tolerant CAN | Convenience CAN |
+| ATA6662 (Atmel) | LIN transceiver | LIN bus (seat modules etc.) |
+| T6020AM | Watchdog microcontroller | Gateway health monitoring |
+
+---
+
+## The Constellation Process — Exactly How It Works
+
+The "constellation" is VW's term for the set of module identities J533 expects to see on each ignition cycle. Here is the full process, from power-on to CP enforcement:
+
+### Phase 1: Power-Up (Terminal 30 applied)
+
+1. J533 MCU wakes from sleep/standby
+2. MCU loads constellation table from internal flash
+3. MCU initializes all CAN transceivers and bus interfaces
+4. J533 begins listening on all sub-buses (Convenience CAN, Powertrain CAN, etc.)
+
+### Phase 2: Wake Sequence (Terminal 15 — ignition ON)
+
+1. J533 broadcasts wake-up messages on all sub-buses
+2. Each control module wakes and transmits its **Node Identifier** — a broadcast that includes:
+   - Module part number
+   - Module serial number
+   - Current software version
+   - Module status flags
+3. J533 collects all Node Identifiers and builds the current bus topology picture
+
+### Phase 3: Constellation Verification
+
+For each module enrolled in CP, J533 performs:
+
+```
+For each module M in CP_enrollment_table:
+    received_serial = NodeID[M].serial_number
+    expected_serial = constellation_table[M].expected_serial
+    
+    if received_serial != expected_serial:
+        send CP_restrict_command(M)
+        set DTC: "Component Protection Active" in M
+    else:
+        # Module OK — no action needed
+        pass
+```
+
+**The comparison is serial number based, not VIN-hash based.** This is confirmed by community analysis and explains why:
+- Moving the same module between two cars triggers CP (serial doesn't match new car's constellation table)
+- Replacing J533 itself triggers CP on all modules (new J533 has no constellation table — all serials are "unknown")
+- Battery disconnection can trigger CP if it causes J533 to reload a corrupted or reset constellation table
+- Your original J255 now fails — because ODIS wrote the *donor* J255's serial into your J533's constellation table during the previous GEKO session
+
+### Phase 4: CP Restriction Enforcement
+
+When J533 sends the CP restriction command to a module:
+
+```
+J533 → J255 (0x746): UDS WriteDataByIdentifier or RoutineControl
+  [Security level required: CP enforcement key]
+  [Payload: CP_ACTIVE flag]
+
+J255 receives this, writes CP_ACTIVE=1 to its own EEPROM
+J255 enters restricted mode (defrost only, no full HVAC)
+J255 stores DTC: component protection active
+```
+
+**The restriction is enforced by the module itself** — J533 only signals it. The module checks its own CP flag in its EEPROM on every power cycle. This is why:
+- Clearing the DTC doesn't help (module rereads its own EEPROM and resets the flag)
+- VCDS can't fix it (can't write the CP flag without security level access)
+- You need a full ODIS CP removal to rewrite the flag with proper authentication
+
+### Phase 5: Ongoing Monitoring
+
+CP is not just checked at startup. J533 periodically re-verifies the constellation during vehicle operation:
+- Typically on every ignition cycle
+- Can also re-check on bus topology changes (module dropping off / coming back)
+- Explains spontaneous CP activation during long battery events
+
+---
+
+## What ODIS Does During CP Removal (Reconstructed Protocol)
+
+Based on community captures and ODIS behavior analysis:
+
+```
+1. ODIS opens Extended Diagnostic Session with J533 (0x710)
+   → 02 10 03
+
+2. ODIS performs SecurityAccess on J533 at CP security level (level varies by platform)
+   → 02 27 [odd_level]           (Seed request)
+   ← [seed_bytes]                (J533 returns random seed)
+   → [key_bytes]                 (ODIS calculates key from seed)
+   ← 02 67 [even_level]          (Security granted)
+
+3. ODIS reads module identification from J255 via J533 routing
+   → 03 22 F1 8C                 (Read ECU Serial Number DID)
+   ← [J255 serial number]
+   → 03 22 F1 90                 (Read VIN DID)  
+   ← [VIN currently in J255]
+
+4. ODIS builds CP request payload:
+   {
+     target_module: "J255",
+     target_serial: [J255 serial],
+     current_vin: [J255 current VIN],
+     new_vin: [host vehicle VIN],
+     gateway_serial: [J533 serial],
+     technician_id: [GEKO/GRP login],
+     timestamp: [current UTC]
+   }
+
+5. ODIS sends payload to GEKO/GRP server over HTTPS
+   POST https://geko.vw.com/api/cp/authorize
+   {payload}
+
+6. Server queries FAZIT:
+   - Is J255 serial flagged stolen? → FAZ4990E if yes
+   - Is transfer authorized? → Authorization token if yes
+
+7. Server returns signed authorization token
+   {token, signature, expiry}
+
+8. ODIS executes CP removal routine on J533:
+   → 0x31 01 [CP_ROUTINE_ID] [token_payload]
+   (RoutineControl, Start, routine ID, signed token)
+
+9. J533 verifies token signature using its embedded public key
+   If valid:
+   → J533 sends new constellation write to J255:
+     → J255 writes CP_ACTIVE=0 to its EEPROM
+     → J255 writes new VIN binding to its EEPROM
+     → J255 updates constellation entry in J533 MCU flash
+
+10. J533 updates its constellation table in MCU flash:
+    constellation_table[J255].expected_serial = J255_serial
+    constellation_table[J255].bound_vin = new_vin
+
+11. J255 sends positive response, stores "CP removed" in operational log
+12. ODIS confirms completion to technician
+```
+
+**The token validation in step 9 is the key barrier.** The token is asymmetrically signed by the GEKO/GRP server using a private key. J533 has the corresponding public key embedded in its MCU firmware. Without the server's private key to generate a valid signature, the routine will be rejected regardless of what you send.
+
+This is what makes the Lear platform harder than the Temic platform — on Temic, the "constellation" data was simpler and lived more fully in the EEPROM, making it accessible without cryptographic tokens.
+
+---
+
+## Part Numbers for Flashdaten Search
+
+### Your J533 Gateway — 4G0907468x Family
+
+The `4G` prefix identifies the A6/A7 C7 platform (internal code "AU57"). All variants are Lear gateway architecture.
+
+| SW Part Number | HW Part Number | Component String | Notes |
+|---|---|---|---|
+| `4G0 907 468 A` | `4G0 907 468 A` | `J533--Gateway H13 xxxx` | Early production 2011 |
+| `4G0 907 468 B` | `4G0 907 468 B` | `J533--Gateway H13 xxxx` | 2011-2012 |
+| `4G0 907 468 C` | `4G0 907 468 C` | `J533--Gateway H13 xxxx` | 2012 common variant |
+| `4G0 907 468 D` | `4G0 907 468 D` | `J533--Gateway H13 xxxx` | 2012-2013 |
+| `4G0 907 468 E` | `4G0 907 468 E` | `J533--Gateway H13 xxxx` | 2013 — likely your car |
+| `4G0 907 468 F` | `4G0 907 468 F` | `J533--Gateway H13 xxxx` | 2013-2014 |
+| `4G0 907 468 G` | `4G0 907 468 G` | `J533--Gateway H13 xxxx` | 2014 common |
+| `4G0 907 468 H` | `4G0 907 468 H` | `J533--Gateway H13 xxxx` | 2014-2015 |
+| `4G0 907 468 J` | `4G0 907 468 J` | `J533--Gateway H13 xxxx` | 2015 |
+| `4G0 907 468 K` | `4G0 907 468 K` | `J533--Gateway H13 xxxx` | 2015-2016 |
+| `4G0 907 468 L` | `4G0 907 468 L` | `J533--Gateway H13 xxxx` | FL1 facelift intro |
+| `4G0 907 468 M` | various | `J533--Gateway H13 xxxx` | Facelift |
+| `4G0 907 468 AD` | `4G0 907 468 AC` | `J533--Gateway H13 0050` | Late C7 (confirmed from live scan) |
+
+**ASAM Dataset identifiers for J533 on C7:**
+- `EV_GatewPkoUDS 001013` through `001028` — various software builds
+- `EV_GatewPkoUDS 002000`, `002011` — later builds
+- `EV_GatewCONTIAU736 002060` — Continental-manufactured variant
+
+**Dataset number** (appears in VCDS scan, different from part number):
+- `4G0909515x` series — this is the calibration dataset number
+- Example confirmed: `4G0909515H 0067`
+
+**Flashdaten filename pattern to search:**
+```
+4G0907468*.sgo     ← Flash files for J533 C7
+4G0907468*.frf     ← Alternative format
+4G0909515*.pdx     ← Dataset/calibration files
+EV_GatewPkoUDS*    ← ASAM dataset files
+```
+
+### Related C7 Gateways (Share Architecture)
+
+| Platform | Part Number Prefix | Notes |
+|---|---|---|
+| A7 Sportback 4G | `4G0 907 468x` | Identical to A6 C7 |
+| A8 D4 (4H) | `4H0 907 468x` | Closely related Lear gateway |
+| Q7 4L (late) | `4L0 910 468x` | Older Temic, different |
+| Touareg 7P | Various | Similar Lear architecture |
+
+### J255 Climatronic — Part Numbers
+
+The J255 for your 2013 A6 C7 depends on trim level:
+
+| Config | Part Number | ASAM Dataset |
+|---|---|---|
+| 2-zone base | `4G0 820 043x` | `EV_AirCondiBasisUDS` |
+| 2-zone comfort | `4G1 820 043x` | `EV_AirCondiBasisUDS` |
+| 4-zone comfort | `4G0 820 043x` | `EV_AirCondiComfoUDS` |
+| Digital 4-zone (donor) | `4G1 820 043x` | `EV_AirCondiComfoUDS` |
+
+**Flashdaten search:**
+```
+4G0820043*.sgo
+4G1820043*.sgo
+EV_AirCondiBasisUDS*
+EV_AirCondiComfoUDS*
+```
+
+### J136 — Memory Seat Driver / Steering Column
+
+| Part Number | ASAM | Notes |
+|---|---|---|
+| `4H0 959 760x` | `EV_SeatMemoDriv*` | Standard on A6 C7 |
+| `4G0 959 760x` | `EV_SeatMemoDriv*` | Alternative |
+
+**Flashdaten search:**
+```
+4H0959760*.sgo
+4G0959760*.sgo
+EV_SeatMemo*
+```
+
+### J521 — Memory Seat Passenger
+
+| Part Number | ASAM | Notes |
+|---|---|---|
+| `4H0 959 748x` | `EV_SeatMemoPasse*` | Standard |
+| `4G0 959 748x` | `EV_SeatMemoPasse*` | Alternative |
+
+---
+
+## Flashdaten File Structure — What to Look For
+
+Within your ODIS-S installation, the PostSetup (flashdaten) contains:
+
+### File Types
+
+| Extension | Content | Relevant to CP? |
+|---|---|---|
+| `.sgo` | Flash container (compressed) — contains .frf or .pdx | Yes — contains firmware |
+| `.frf` | Flash Record File — ECU firmware binary | Yes — contains UDS service definitions |
+| `.pdx` | Parameter/Dataset container | Yes — contains routine definitions |
+| `.odx` | Open Diagnostic eXchange — XML format | **Most relevant** — defines all services, DIDs, routines |
+| `.rod` | Read-Only Data — fault code texts | Less relevant |
+| `.clb` | Calibration/label file | Less relevant |
+
+### What to Search in ODX Files
+
+The ODX files for J533 will contain the CP routine definition. Look for:
+
+```xml
+<!-- Search for these in EV_GatewPkoUDS*.odx or similar -->
+<ROUTINE-SPEC>
+  <SHORT-NAME>ComponentProtection</SHORT-NAME>   <!-- or Komponentenschutz -->
+  ...
+  <REQUEST-REF DOCREF="..." DOCTYPE="..." />
+</ROUTINE-SPEC>
+
+<!-- Also look for the routine identifier bytes -->
+<CODED-CONST SEMANTIC="SERVICE-ID">0x31</CODED-CONST>  <!-- RoutineControl -->
+<CODED-CONST SEMANTIC="TYPE">0x01</CODED-CONST>         <!-- Start routine -->
+<CODED-CONST SEMANTIC="ROUTINE-ID">0xXXXX</CODED-CONST> <!-- CP routine ID -->
+```
+
+The security access levels for CP operations:
+```xml
+<SECURITY-ACCESS-SPEC>
+  <SHORT-NAME>CP_Security</SHORT-NAME>
+  <ACCESS-LEVEL>0xXX</ACCESS-LEVEL>  <!-- The level ODIS uses for CP -->
+</SECURITY-ACCESS-SPEC>
+```
+
+### Where to Find These Files
+
+In ODIS-S 25.x installation:
+```
+C:\ProgramData\ODIS-S\PostSetup\
+    └── [brand folders: VW, AUDI, etc.]
+        └── [various .sgo, .pdx, .odx files]
+
+C:\ProgramData\ODIS-S\diagdata\
+    └── [dataset folders organized by ASAM ID]
+        └── EV_GatewPkoUDS\
+            └── *.odx    ← This is your goldmine
+```
+
+To extract .sgo files:
+```bash
+# ODIS uses standard zip-based compression for .sgo containers
+# Try: rename .sgo to .zip and extract
+# Or use 7-zip which handles most VAG container formats
+```
+
+To read .odx files:
+```python
+import xml.etree.ElementTree as ET
+
+tree = ET.parse('EV_GatewPkoUDS_001_AU57.odx')
+root = tree.getroot()
+
+# Find all routine definitions
+for routine in root.iter('ROUTINE-SPEC'):
+    name = routine.find('SHORT-NAME')
+    if name is not None and ('protect' in name.text.lower() or 'komponent' in name.text.lower()):
+        print(f"Found CP routine: {name.text}")
+        # Extract the routine details...
+```
+
+---
+
+## The Two-Chip Model — Implications for Research
+
+Understanding that J533 uses both an EEPROM and an MCU with internal flash leads to important research directions:
+
+### Research Path 1: OBD DID Scan of J533
+
+Using python-udsoncan and your Mongoose cable, enumerate all Data Identifiers on J533. Some of these DIDs will return constellation-related data in readable form:
+
+```python
+# Relevant DIDs to probe on J533 (0x710/0x77A):
+KNOWN_DIDS = {
+    0xF190: "VIN",
+    0xF18C: "ECU Serial Number", 
+    0xF187: "Spare Part Number",
+    0xF189: "Software Version",
+    0xF197: "Vehicle Type",
+    0xF1A0: "ECU date",
+    # Scan 0x0000-0x9999 for unknown ones
+}
+```
+
+DIDs in the range `0x0100-0x0999` often contain manufacturer-specific data including CP state. These will appear in the ODX files once you find them.
+
+### Research Path 2: The MCU Flash Read via V850 Bus
+
+The D70F3433 (V850E core) has a serial programming interface accessible via test points or component pads on the gateway PCB. With a V850 programmer (CarProTool supports this), you can read the MCU flash directly — bypassing all software protection. This is how the professional tools do deep CP operations on the Lear platform.
+
+The V850 VFB (Velocity Fetch Bus) interface on the D70F3433:
+- Standard 4-wire SPI-like interface
+- Requires dedicated programmer (not a generic SPI reader)
+- Test pins are typically accessible without desoldering the MCU
+
+### Research Path 3: EEPROM + MCU Correlation
+
+If you read both the EEPROM (95320) and the MCU flash (D70F3433) from both your host and donor J533, you can:
+1. Diff the two EEPROMs to find what changed after the GEKO session
+2. Diff the two MCU flash images to identify the constellation table structure
+3. Map the EEPROM fields to their MCU flash counterparts
+4. Understand the relationship between what ODIS writes where
+
+This is the kind of research that, if documented publicly, would be a major contribution to the right-to-repair documentation project.
+
+---
+
+## Sources
+- MHH Auto — Gateway hardware teardown thread (D70F3433 identification, EEPROM clone research)
+- Ross-Tech Wiki — A6 C7 gateway part number documentation  
+- Audizine — Live VCDS scans showing 4G0907468AD confirmed part number
+- ABRITES VAG manual — CP procedure details
+- Jim Ellis Audi Parts — OEM parts fitment data for 4G0907468C
+- eBay listing data — 4G0907468G fitment (2012-2018 confirmed)
+- diagnostics.vis4vag.com — A6 4G gateway variant listing (EV_GatewPkoUDS variants)
