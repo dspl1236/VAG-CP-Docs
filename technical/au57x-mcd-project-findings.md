@@ -391,24 +391,27 @@ for did in range(0xEA00, 0xEB00):
 
 Any DID that returns data rather than NRC `0x31` is worth investigating. The `0xEA6x` range should return CP-related data.
 
-### If Windows Tooling Becomes Available
+### MWB Extraction — Now Runs on Linux
 
-Running `dumpMWB.py` against the AU57X project on Windows would yield:
-- Exact byte offsets of every field in `GatewCompoList`
-- Exact hex DID addresses for all services above
-- Security access level required for CP operations
-- The routine ID bytes for `RoutiContrStartRoutiCompoProte`
+`dumpMWB.py` was successfully run against the AU57X project on Linux without a Windows VM.
+The `pbl.dll` dependency was resolved by compiling the open-source PBL library
+([github.com/peterGraf/pbl](https://github.com/peterGraf/pbl)) as a native Linux `.so`
+and patching `classes/PBL.py` to use it on non-Windows hosts.
 
-The script is part of the [ODIS-project-explorer](https://github.com/kartoffelpflanze/ODIS-project-explorer) tool. It requires a Windows host with VW-MCD 19.x installed at `C:\Program Files\Volkswagen\VW-MCD_19_0_2-64\`.
+The full extraction completed in 59 seconds and produced confirmed DID addresses for all
+constellation and CP-related services. See `au57x-mwb-extraction-confirmed-dids.md` for
+the complete findings.
 
 ---
 
 ## Limitations of This Document
 
-- **No hex DID addresses.** The string database contains identifier names but not the encoded addresses. Those require the `.bv.db` decoder.
-- **No byte layouts.** Field sizes and offsets within `GatewCompoList` are not available from string extraction alone.
-- **No security level bytes.** The seed/key security access level for CP operations is in the binary data, not the strings.
 - **V12 vs V11 differences.** Several V12-only fields were identified above, but a complete diff of V11 vs V12 service definitions requires full ODX decoding.
+- **CP library routine IDs.** The exact 2-byte routine IDs for `RoutiContrStartRoutiCompoProte` live in `ES_LIBCompoProteGen3V12.sd.db` and have not yet been extracted.
+
+**Previously listed as limitations — now resolved:** The hex DID addresses, byte layouts of the constellation
+DIDs, and security access level are all confirmed. See  for the full
+findings from the Linux-native  extraction run against this project.
 
 ---
 

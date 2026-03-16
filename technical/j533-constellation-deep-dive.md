@@ -461,7 +461,10 @@ These service identifiers were confirmed directly from the AU57X AStringData str
 | `DC_BV_GatewUDS_SinglJob_CompoListRead` | Single job wrapper | Read via job |
 | `DC_BV_GatewUDS_SinglJob_CompoListWrite` | Single job wrapper | Write via job |
 
-The DID address for `GatewCompoList` is encoded in the `.bv.db` binary (PBL format, requires Windows `pbl.dll` to decode). Empirical probing of the `0xEA60–0xEA70` range on J533 is the recommended approach without Windows tooling.
+The DID address for `GatewCompoList` is **confirmed as `0x04A3`** from the Linux-native dumpMWB.py
+extraction of the AU57X MCD project. Empirical probing is no longer necessary for this platform.
+See `au57x-mwb-extraction-confirmed-dids.md` for the full confirmed DID map including all six
+constellation sub-DIDs (`0x2A26`–`0x2A2C`).
 
 #### Constellation Data Object Structure
 
@@ -603,16 +606,20 @@ The C7 A6 non-hybrid gateway maps to `EV_GatewPKOUDS_001`.
 
 ---
 
-### What Still Requires Windows Tooling
+### Previously Required Windows — Now Resolved on Linux
 
-The following cannot be extracted from the gzip string databases alone — they require the `pbl.dll` decoder (part of VW-MCD 19.x for Windows) run against the `.bv.db` / `.sd.db` binary files:
+The items below were previously listed as requiring `pbl.dll` (Windows-only). They have been resolved
+by running `dumpMWB.py` natively on Linux using the open-source PBL library. See
+`au57x-mwb-extraction-confirmed-dids.md` for complete details.
 
-- **Exact hex DID addresses** for `GatewCompoList`, `CompoProteData`, and `TheftProteData` writes
-- **Security access level** required for CP operations (the seed/key level byte)
-- **Exact byte layout** of the `GatewCompoList` response (field offsets and lengths)
-- **Routine ID bytes** for `RoutiContrStartRoutiCompoProte` (the `0x31 01 XX XX` payload)
-
-Workaround: empirical DID scanning of J533 in the `0xEA00–0xEB00` range using python-udsoncan and the ESP32 bridge will reveal which addresses respond. The `0xEA61–0xEA64` range identified above is the confirmed starting point.
+| Item | Status |
+|---|---|
+| Exact hex DID addresses for `GatewCompoList` and sub-DIDs | ✓ Confirmed: `0x04A3`, `0x2A26`–`0x2A2C` |
+| Exact byte layout of `GatewCompoList` response | ✓ Confirmed: END-OF-PDU-FIELD of 1-byte bitfields |
+| ECU Name code for J255 | ✓ Confirmed: `8` (Air Conditioning) from `0x2A2A` TEXTTABLE |
+| IKA/GKA key DID addresses on J255 | ✓ Confirmed: `0x00BE` (IKA), `0x00BD` (GKA), 34 bytes each |
+| Security access level for CP writes | ✓ Confirmed: None required — extended session only, GEKO token provides auth |
+| Routine ID bytes for `RoutiContrStartRoutiCompoProte` | ✗ Still open — in `ES_LIBCompoProteGen3V12.sd.db` |
 
 ---
 
