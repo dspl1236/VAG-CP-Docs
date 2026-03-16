@@ -427,7 +427,196 @@ This is the kind of research that, if documented publicly, would be a major cont
 
 ---
 
-## Sources
+## Confirmed Service Layer — AU57X MCD Project (September 2022)
+
+*The following section is based on direct extraction from the AU57X ODIS diagnostic project (DVR 72, revision date 2022-09-22). String databases were decompressed from `AStringData.data.gz` (36 MB decompressed, 601K strings) and filtered for CP and gateway-relevant identifiers. This moves the information in preceding sections from "reconstructed from behavior" to "confirmed from source."*
+
+---
+
+### Library Architecture — How CP Routines Are Structured
+
+The CP routines do **not** live directly in the `BV_GatewUDS` base variant. They live in a shared library that is included into each relevant ECU's diagnostic project:
+
+```
+ES_LIBCompoProteGen3V12   ← CP authentication routines (revision 004001, 2022-07-12)
+ES_LIBCompoProteGen3V11   ← Earlier version (revision 001002, 2020-06-24)
+ES_LIBCOPKWPSubsy         ← KWP2000 subsystem CP (older platforms)
+BL_LIBTheftProte          ← Theft protection / key download library
+```
+
+`ES_LIBCompoProteGen3V12` is the current library used on the C7 platform. Both V11 and V12 are present in the AU57X project for backwards compatibility across the model run.
+
+---
+
+### Confirmed Service Names — J533 Gateway (BV_GatewUDS)
+
+These service identifiers were confirmed directly from the AU57X AStringData string database:
+
+#### Constellation List (the serial number table)
+
+| Service identifier | UDS service | Direction |
+|---|---|---|
+| `DC_BV_GatewUDS_DiagnServi_ReadDataByIdentGatewCompoList` | ReadDataByIdentifier (0x22) | Read constellation from J533 |
+| `DC_BV_GatewUDS_DiagnServi_WriteDataByIdentGatewCompoList` | WriteDataByIdentifier (0x2E) | Write constellation to J533 |
+| `DC_BV_GatewUDS_SinglJob_CompoListRead` | Single job wrapper | Read via job |
+| `DC_BV_GatewUDS_SinglJob_CompoListWrite` | Single job wrapper | Write via job |
+
+The DID address for `GatewCompoList` is encoded in the `.bv.db` binary (PBL format, requires Windows `pbl.dll` to decode). Empirical probing of the `0xEA60–0xEA70` range on J533 is the recommended approach without Windows tooling.
+
+#### Constellation Data Object Structure
+
+The `GatewCompoList` DID returns a structured record. The following sub-fields were confirmed from AU57X:
+
+| Field name | Description |
+|---|---|
+| `GatewCompoListAlloc` | Allocation status — is slot occupied |
+| `GatewCompoListDiagP` | Diagnostic path to the module |
+| `GatewCompoListDtc` | DTC associated with this slot |
+| `GatewCompoListPrese` | Module presence flag |
+| `GatewCompoListSleep` | Sleep state |
+| `GatewCompoListTPIdent` | Transport Protocol identifier (CAN ID) |
+| `GatewCompoListECUIdent` | ECU identity (serial number — the key field) |
+| `GatewCompoListECUNodeAddre` | Node address (added in V52+ of the UDSDistr library) |
+| `GatewCompoListEcuAuthe` | ECU authentication field (added in V52+) |
+
+The `ECUIdent` / `ECUNodeAddre` fields are what get compared against the module's actual serial at each ignition cycle.
+
+#### Other Relevant J533 Services
+
+| Service identifier | Relevance |
+|---|---|
+| `DC_BV_GatewUDS_DiagnServi_WriteDataByIdentTheftProteData` | Write CP keys to gateway calibration |
+| `DC_BV_GatewUDS_DiagnServi_WriteDataByIdentCalibData` | Write calibration data (contains IKA key row) |
+| `TBP_BV_GatewUDS_TAB_RecorDataIdentCalibDataWrita.TABROW_IKAKeyL` | IKA key row within calibration write table |
+
+---
+
+### Confirmed Service Names — J255 HVAC (BV_AirCondiUDS)
+
+#### TheftProteData — The CP Key Download
+
+This is the write operation that actually clears CP from J255. Two key download rows confirmed:
+
+| TABROW name | Description |
+|---|---|
+| `TABROW_TheftProteDownlGFAKey` | Downloads the GFA key (Geräteinzelfreigabe — server authorization key) |
+| `TABROW_TheftProteDownlIKAKey` | Downloads the IKA key (installation key, ties module to vehicle) |
+
+Both rows are within:
+```
+TBP_BV_AirCondiUDS_TAB_RecorDataIdentTheftProteDataWrita
+```
+
+The full service call confirmed:
+```
+DC_BV_AirCondiUDS_DiagnServi_WriteDataByIdentTheftProteData
+```
+
+Additional confirmed rows in calibration write for J255:
+- `TABROW_GKAKey` — GKA key (Geräteklassenfreigabe — device class authorization)
+- `TABROW_IKAKey` — IKA key
+
+---
+
+### Confirmed Service Names — CP Authentication Library (ES_LIBCompoProteGen3V12)
+
+The actual UDS RoutineControl calls for CP authentication flow through this library:
+
+| Service identifier | UDS mapping |
+|---|---|
+| `DC_ES_LIBCompoProteGen3V12_DiagnServi_RoutiContrStartRoutiCompoProte` | 0x31 01 [routine_id] — Start CP auth routine |
+| `DC_ES_LIBCompoProteGen3V12_DiagnServi_RoutiContrStopRoutiCompoProte` | 0x31 02 [routine_id] — Stop CP auth routine |
+| `DC_ES_LIBCompoProteGen3V12_DiagnServi_RoutiContrRequeRoutiResulCompoProte` | 0x31 03 [routine_id] — Request routine result |
+| `DC_ES_LIBCompoProteGen3V12_DiagnServi_ReadDataByIdentCompoProteData` | 0x22 [did] — Read CP data |
+
+#### Confirmed CP Activation Parameter DID Range
+
+The following parameter names were extracted directly from AU57X, confirming the DID address range for CP activation:
+
+```
+Param_CompoProteActiv0xEA61
+Param_CompoProteActiv0xEA62
+Param_CompoProteActiv0xEA63
+Param_CompoProteActiv0xEA64
+```
+
+This confirms the CP activation DID family sits at **`0xEA61–0xEA64`**. These are likely the per-module CP activation flags read by J533 during enforcement. The full `ReadDataByIdentCompoProteData` DID address for the CP library is within or adjacent to this range.
+
+Additional confirmed CP parameter names:
+- `Param_CompoProte` — base CP status
+- `Param_CompoProteGener` — CP generation (Gen 3 = V12 library)
+- `Param_CompoProteK0` — CP key 0
+- `Param_CompoProteRole` — role (master / slave)
+- `Param_CompoProteNoOrIncorBasicSetti` — no or incorrect basic settings flag
+- `Param_StatuOfCompoProteSlave` — slave status field
+- `Param_ListOfStatuOfCompoProteSlave2` — list of all slave statuses (dynamic length)
+- `Param_TestProgrCompoProteK0` — test programmer CP K0 (used during factory programming)
+
+#### Routine Option Structures
+
+The RoutineControl Start payload for CP authentication uses these option structures:
+
+| Structure name | Description |
+|---|---|
+| `STRUC_RoutiContrOptioStartCompoProteAuthe` | Options for StartRoutine CP authentication |
+| `STRUC_RoutiContrOptioActivOfCompoProteFunct` | Options for routine that activates CP function |
+| `STRUC_RoutiStatuRecorStartCompoProteAuthe` | Status record returned by StartRoutine |
+| `STRUC_RoutiStatuRecorActivOfCompoProteFunct` | Status record for activation routine |
+| `STRUC_DataRecorCompoProteChara` | CP characteristics data record |
+| `STRUC_DataRecorStatuOfCompoProteSlave2` | Dynamic list of slave CP statuses |
+
+---
+
+### Confirmed ES_LIBCOPKWPSubsy — KWP Subsystem (per-module CP identity)
+
+This library handles per-module CP identity reads on KWP2000 sub-buses (used for modules like seat ECUs connected via the KWP subsystem). Confirmed services:
+
+```
+DC_ES_LIBCOPKWPSubsy_DiagnServi_ReadDataByIdentVWSlaveIdentDataCOPMulti
+DC_ES_LIBCOPKWPSubsy_DiagnServi_ReadDataByIdentVWSlaveFAZITIdentStrinCOP
+DC_ES_LIBCOPKWPSubsy_DiagnServi_ReadDataByIdentVWSlaveSeriaNumbe COP
+DC_ES_LIBCOPKWPSubsy_DiagnServi_WriteDataByIdentVWSlaveCodinValueCOP
+```
+
+This is the mechanism J533 uses to read identity information from modules on sub-buses (not directly on the main CAN), and is relevant for seat module CP.
+
+---
+
+### Protocol Path (Confirmed from AU57X)
+
+The full diagnostic addressing chain confirmed from AU57X index:
+
+```
+[Protocol]PR_UDSOnCAN
+  └─ [EcuBaseVariant]BV_GatewUDS
+       └─ [EcuVariant]EV_GatewPKOUDS_001   ← Standard C7 gateway variant
+       └─ [EcuVariant]EV_GatewPKOUDS_002   ← EV/hybrid variant
+       └─ [EcuVariant]EV_GatewUDS_001      ← Older variant
+
+[Protocol]PR_UDSOnCAN
+  └─ [EcuBaseVariant]BV_AirCondiUDS
+       └─ [EcuVariant]EV_AirCondiBasisUDS_002/003/004   ← 2-zone HVAC
+       └─ [EcuVariant]EV_AirCondiComfoUDS_002/003/004   ← 4-zone HVAC
+```
+
+The C7 A6 non-hybrid gateway maps to `EV_GatewPKOUDS_001`.
+
+---
+
+### What Still Requires Windows Tooling
+
+The following cannot be extracted from the gzip string databases alone — they require the `pbl.dll` decoder (part of VW-MCD 19.x for Windows) run against the `.bv.db` / `.sd.db` binary files:
+
+- **Exact hex DID addresses** for `GatewCompoList`, `CompoProteData`, and `TheftProteData` writes
+- **Security access level** required for CP operations (the seed/key level byte)
+- **Exact byte layout** of the `GatewCompoList` response (field offsets and lengths)
+- **Routine ID bytes** for `RoutiContrStartRoutiCompoProte` (the `0x31 01 XX XX` payload)
+
+Workaround: empirical DID scanning of J533 in the `0xEA00–0xEB00` range using python-udsoncan and the ESP32 bridge will reveal which addresses respond. The `0xEA61–0xEA64` range identified above is the confirmed starting point.
+
+---
+
+
 - MHH Auto — Gateway hardware teardown thread (D70F3433 identification, EEPROM clone research)
 - Ross-Tech Wiki — A6 C7 gateway part number documentation  
 - Audizine — Live VCDS scans showing 4G0907468AD confirmed part number

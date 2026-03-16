@@ -65,10 +65,25 @@ This case illustrates several distinct harms:
 
 ---
 
+### Confirmed Fault Codes
+
+The following DTC codes were confirmed from the AU57X DIDB diagnostic database (HSQLDB dump, 92,583 rows):
+
+| DTC (ISO/SAE) | VAG internal code | Description | Module |
+|---|---|---|---|
+| `U110100` | `7465` | Component protection active | J255, J136, J521 (stored in affected module) |
+| `B1B0400` | — | Component protection master | J533 (stored in gateway when acting as CP master) |
+| `B1B0300` | — | Component protection slave | J255 etc. (stored when enrolled as CP slave) |
+
+`U110100` / VAG `7465` is the specific DTC this vehicle is experiencing in J255. It cannot be cleared without completing the CP removal routine — the module resets the flag from its own storage on every power cycle.
+
+---
+
 ### Documentation
 - NHTSA TSB 91-18-13TT (spontaneous CP activation acknowledgment)
 - VAG Programming — Component Protection on C7 platform
 - Audizine forums — seat retrofit CP documentation on A6/A7 C7
+- AU57X ODIS MCD project, DVR 72 (September 2022) — DIDB fault code database
 
 ---
 
