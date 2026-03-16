@@ -56,10 +56,13 @@ VAG-CP-Docs/
 ├── CONTRIBUTING.md            ← How to submit cases and documentation
 ├── technical/                 ← How the system works (public/documented info only)
 │   ├── overview.md
-│   ├── generations.md         ← Gen 1 / Gen 2 / Gen 3 / SFD / SFD2
-│   ├── geko-server.md         ← GEKO/GRP/FAZIT infrastructure
-│   ├── affected-modules.md    ← Comprehensive module list by platform
-│   └── affected-vehicles.md   ← Model/year matrix
+│   ├── generations.md                           ← Gen 1 / Gen 2 / Gen 3 / SFD / SFD2
+│   ├── geko-server.md                           ← GEKO/GRP/FAZIT infrastructure
+│   ├── affected-modules.md                      ← Comprehensive module list by platform
+│   ├── affected-vehicles.md                     ← Model/year matrix
+│   ├── au57x-mcd-project-findings.md            ← C7 A6/A7 ODIS service names (string extraction)
+│   ├── au57x-mwb-extraction-confirmed-dids.md   ← Confirmed DID addresses (Linux MWB extraction)
+│   └── j533-constellation-deep-dive.md          ← J533 hardware, constellation protocol, part numbers
 ├── cases/                     ← Documented consumer impact stories
 │   ├── README.md              ← How to submit a case
 │   ├── template.md            ← Case submission template

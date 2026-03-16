@@ -461,7 +461,10 @@ These service identifiers were confirmed directly from the AU57X AStringData str
 | `DC_BV_GatewUDS_SinglJob_CompoListRead` | Single job wrapper | Read via job |
 | `DC_BV_GatewUDS_SinglJob_CompoListWrite` | Single job wrapper | Write via job |
 
-The DID address for `GatewCompoList` is encoded in the `.bv.db` binary (PBL format, requires Windows `pbl.dll` to decode). Empirical probing of the `0xEA60–0xEA70` range on J533 is the recommended approach without Windows tooling.
+The DID address for `GatewCompoList` is **confirmed as `0x04A3`** from the Linux-native dumpMWB.py
+extraction of the AU57X MCD project. Empirical probing is no longer necessary for this platform.
+See `au57x-mwb-extraction-confirmed-dids.md` for the full confirmed DID map including all six
+constellation sub-DIDs (`0x2A26`–`0x2A2C`).
 
 #### Constellation Data Object Structure
 
@@ -603,33 +606,20 @@ The C7 A6 non-hybrid gateway maps to `EV_GatewPKOUDS_001`.
 
 ---
 
-### Confirmed DID Addresses (Updated March 2026)
+### Previously Required Windows — Now Resolved on Linux
 
-The items previously listed as "requiring Windows tooling" have been resolved. The AU57X `.bv.db` files were decoded on Linux by compiling the open-source PBL library natively. Full methodology and all confirmed DID addresses are documented in [`au57x-mcd-project-findings.md`](./au57x-mcd-project-findings.md).
+The items below were previously listed as requiring `pbl.dll` (Windows-only). They have been resolved
+by running `dumpMWB.py` natively on Linux using the open-source PBL library. See
+`au57x-mwb-extraction-confirmed-dids.md` for complete details.
 
-**Summary of confirmed addresses:**
-
-| DID | Purpose |
+| Item | Status |
 |---|---|
-| `0x04A3` | Gateway Component List — primary constellation bitmap (read/write) |
-| `0x2A2A` | Allocation table — maps slot indices to ECU names. ECU Name 8 = J255. |
-| `0x2A26` | Present bitmap — which modules are online |
-| `0x2A27` | Sleep indication bitmap |
-| `0x2A28` | DTC bitmap — which modules have active faults |
-| `0x2A29` | DiagProt — transport protocol per module |
-| `0x2A2C` | TP-Identifier — CAN TX IDs per slot. J255 = `0x0746`. |
-| `0x0438–0x043E` | Theft protection counters and showroom mode |
-| `0x2CA9` | Service key 2 sampling status |
-| `0x00BE` | IKA Key (34 bytes) — the component protection key. Present on J533 and J255. |
-| `0x00BD` | GKA Key (34 bytes) — device class key on J255 only |
-
-**Security level confirmed:** All CP write services run in extended diagnostic session (`0x10 0x03`) with no SA2 seed/key challenge. The GEKO server token provides authorization at the application layer.
-
-**Reading CP state without GEKO:** Reading `0x00BE` (IKA Key) from J255 in extended session tells you definitively whether CP is active:
-- 34 zero bytes = no key installed = CP active
-- Non-zero = key is present (CP may be cleared)
-
-**The `0xEA61–0xEA64` range** identified from string mining does not appear in `EV_GatewPKOUDS_001` MWB output. It likely refers to CP status DIDs on slave modules (J255, J136) rather than J533. The confirmed J533 CP DIDs are in the `0x04A3` and `0x2Axx` ranges.
+| Exact hex DID addresses for `GatewCompoList` and sub-DIDs | ✓ Confirmed: `0x04A3`, `0x2A26`–`0x2A2C` |
+| Exact byte layout of `GatewCompoList` response | ✓ Confirmed: END-OF-PDU-FIELD of 1-byte bitfields |
+| ECU Name code for J255 | ✓ Confirmed: `8` (Air Conditioning) from `0x2A2A` TEXTTABLE |
+| IKA/GKA key DID addresses on J255 | ✓ Confirmed: `0x00BE` (IKA), `0x00BD` (GKA), 34 bytes each |
+| Security access level for CP writes | ✓ Confirmed: None required — extended session only, GEKO token provides auth |
+| Routine ID bytes for `RoutiContrStartRoutiCompoProte` | ✗ Still open — in `ES_LIBCompoProteGen3V12.sd.db` |
 
 ---
 
