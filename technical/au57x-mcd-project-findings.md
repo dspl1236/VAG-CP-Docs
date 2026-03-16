@@ -424,3 +424,131 @@ The script is part of the [ODIS-project-explorer](https://github.com/kartoffelpf
 ---
 
 *Released under CC0 (public domain).*
+
+---
+
+## Update: Native Linux MWB Extraction — All DID Addresses Now Confirmed
+
+*Added: March 2026*
+
+The limitation noted above ("requires Windows tooling") has been resolved. The AU57X `.bv.db` files were decoded on Linux without ODIS installed by compiling the open-source PBL library natively and patching `ODIS-project-explorer` to load the resulting `.so` instead of `pbl.dll`.
+
+### Method
+
+```bash
+# 1. Clone PBL (MIT-licensed C library, github.com/peterGraf/pbl)
+git clone --depth=1 https://github.com/peterGraf/pbl.git
+
+# 2. Compile as a Linux shared library
+cd pbl/src/src
+gcc -shared -fPIC -o pbl_linux.so pblkf.c pblhash.c pbl.c -lm
+
+# 3. Patch ODIS-project-explorer/classes/PBL.py to use .so on Linux
+# (two-line change: detect sys.platform != 'win32', substitute path)
+
+# 4. Run against the AU57X project folder
+python3 dumpMWB.py project /path/to/AU57X /output
+# Elapsed: 00:00:59
+```
+
+No Windows VM. No VW-MCD installation. No `pbl.dll` from ODIS. The bundled `bin/pbl.dll` in ODIS-project-explorer is a Windows x64 DLL that cannot be loaded on Linux via ctypes — but the library it wraps is fully open source and compiles cleanly with a single gcc command.
+
+Output for AU57X: 110+ JSON files across all ECU variants. The two relevant outputs:
+- `BV_GatewUDS/MWB_EV_GatewPKOUDS_001.json` — 1.06 MB, 197 DIDs
+- `BV_AirCondiUDS/MWB_EV_AirCondiComfoUDS_002.json` — 1.68 MB
+
+---
+
+## Confirmed DID Addresses — J533 (EV_GatewPKOUDS_001)
+
+These are extracted directly from the MWB JSON, not estimated. All structures described below reflect the actual `dop` objects from the decoded `.bv.db` file.
+
+### Constellation DIDs
+
+| DID | Name | Structure |
+|---|---|---|
+| **`0x04A3`** | Gateway Component List | `END-OF-PDU-FIELD` of 1-byte bitfield records. Each byte covers 8 sequential module slots; bit N set = slot coded. Response length is dynamic (one byte per 8 modules). **Primary read/write constellation DID.** |
+| **`0x2A26`** | Gateway Component List present | Same bitmap layout as `0x04A3`. Bit=1 means module is online (present on CAN bus right now). |
+| **`0x2A27`** | Gateway Component List sleep indication | Same bitmap layout. Bit=1 means module is in sleep state. |
+| **`0x2A28`** | Gateway Component List DTC | Same bitmap layout. Bit=1 means module has an active DTC. |
+| **`0x2A29`** | Gateway Component List DiagProt | One byte per module slot (not a packed bitmap). Per-module: bit0=ISO-TP, bit1=TP2.0, bit2=TP1.6, bit3=K-Line, bit4=Ethernet. |
+| **`0x2A2A`** | Gateway Component List allocation | `END-OF-PDU-FIELD` of `{ECU_ID u8, ECU_Name u8}` pairs, `byte_size=1` each. ECU Name 8 = Air Conditioning (J255). See ECU name table below. |
+| **`0x2A2C`** | Gateway Component List TP-Identifier | `END-OF-PDU-FIELD` of `u16` big-endian CAN TX IDs, one per module slot. J255 appears as `0x0746`. |
+
+### Theft Protection / Key Download DIDs
+
+| DID | Name | Structure |
+|---|---|---|
+| **`0x0438`** | Stored keys for theft protection slaves | `A_BYTEFIELD`, raw |
+| **`0x0439`** | KS ECUs currently authenticated incorrect | `A_BYTEFIELD`, raw |
+| **`0x043A`** | KS ECUs formerly authenticated incorrect since last clearance | `A_BYTEFIELD`, raw |
+| **`0x043C`** | Number of successful key corrections | `u8`, `BCD-P` encoding |
+| **`0x043D`** | Number of successful key downloads | `u8`, `BCD-P` encoding |
+| **`0x043E`** | Theftprotection Showroom Mode | `TEXTTABLE`: `{0: 'not active', 1: 'active'}` |
+| **`0x2CA9`** | Service key 2 sampling status | Byte 0 bits: `[0]`=SK2 active, `[1]`=request normal, `[2]`=request immediate. Bytes 1–20: ECU exception list 1 (20 bytes). Bytes 21–40: ECU exception list 2 (20 bytes). |
+| **`0x00BE`** | IKA Key | `A_BYTEFIELD`, 34 bytes (272 bits). Description: *"Komponentenschutzschlüssel"* (component protection key). **This is the key written by ODIS/GEKO during CP removal.** Present in both J533 and J255. |
+
+### ECU Name Map (from DID `0x2A2A` — confirmed)
+
+| Value | Module |
+|---|---|
+| 1 | Engine Control Module 1 |
+| 2 | Transmission Control Module |
+| 3 | Brakes 1 |
+| 6 | Seat Adjustment Passenger Side |
+| **8** | **Air Conditioning (J255)** |
+| 9 | Central Electrics |
+| 17 | Engine Control Module 2 |
+| 21 | Airbag |
+| 23 | Dash Board |
+| 25 | Gateway (J533, self) |
+| 37 | Immobilizer |
+| 54 | Seat Adjustment Driver Side (J136) |
+| 68 | Steering Assistance |
+| 71 | Sound System |
+| 95 | Information Control Unit 1 |
+
+The full map contains 198 entries covering every possible enrolled module on the AU57X platform.
+
+---
+
+## Confirmed DID Addresses — J255 (EV_AirCondiComfoUDS_002, 4-zone)
+
+From `BV_AirCondiUDS` adaptation dump (`dumpAdaptations.py`):
+
+| DID | Name | Structure | Description |
+|---|---|---|---|
+| **`0x00BE`** | IKA-Key | `A_BYTEFIELD`, 34 bytes | *"IKA-Schlüssel / Schreiben des IKA-Schlüssels"* — the installation key. Written during CP removal. |
+| **`0x00BD`** | GKA-Key | `A_BYTEFIELD`, 34 bytes | *"GFA-Schlüssel / Schreiben des GFA-Schlüssels"* — device class authorization key. J255-specific. |
+
+Reading `0x00BE` in extended session: if the response is 34 zero bytes, no key has been installed — CP is definitively active. A non-zero response means a key is present.
+
+---
+
+## Security Access Level Finding
+
+All CP-related write services (`WriteDataByIdentTheftProteData`, `WriteDataByIdentGatewCompoList`, `WriteDataByIdentCalibData`) show `access_level: None` in the MWB service objects. This means:
+
+- CP write operations run in **extended diagnostic session (`0x10 0x03`) only**
+- **No SA2 seed/key challenge** is required at the UDS layer
+- The GEKO server token provides authorization at the application layer (not via `0x27` SecurityAccess)
+
+This was previously unclear from string analysis alone. The binary service objects confirm it.
+
+---
+
+## What the `0xEA61–0xEA64` Range Actually Is
+
+The range identified in the previous string-mining section (`0xEA61–0xEA64`) does NOT appear in the `EV_GatewPKOUDS_001` MWB output. It likely refers to CP status DIDs on the **slave modules** (J255, J136 etc.) rather than on J533 itself. The confirmed J533 CP DIDs are in the `0x04A3` and `0x2Axx` ranges as documented above.
+
+---
+
+## Sources
+
+- AU57X ODIS MCD Project, DVR 72 (2022-09-22) — `BV_GatewUDS/MWB_EV_GatewPKOUDS_001.json`
+- AU57X `BV_AirCondiUDS/MWB_EV_AirCondiComfoUDS_002.json`
+- AU57X `BV_GatewUDS/ADP_EV_GatewPKOUDS_001.c` (dumpAdaptations output)
+- AU57X `BV_AirCondiUDS/ADP_EV_AirCondiComfoUDS_002.c`
+- kartoffelpflanze/ODIS-project-explorer — extraction tooling
+- peterGraf/pbl — MIT-licensed PBL library (native Linux build)
+

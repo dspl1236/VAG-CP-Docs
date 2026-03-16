@@ -603,16 +603,33 @@ The C7 A6 non-hybrid gateway maps to `EV_GatewPKOUDS_001`.
 
 ---
 
-### What Still Requires Windows Tooling
+### Confirmed DID Addresses (Updated March 2026)
 
-The following cannot be extracted from the gzip string databases alone — they require the `pbl.dll` decoder (part of VW-MCD 19.x for Windows) run against the `.bv.db` / `.sd.db` binary files:
+The items previously listed as "requiring Windows tooling" have been resolved. The AU57X `.bv.db` files were decoded on Linux by compiling the open-source PBL library natively. Full methodology and all confirmed DID addresses are documented in [`au57x-mcd-project-findings.md`](./au57x-mcd-project-findings.md).
 
-- **Exact hex DID addresses** for `GatewCompoList`, `CompoProteData`, and `TheftProteData` writes
-- **Security access level** required for CP operations (the seed/key level byte)
-- **Exact byte layout** of the `GatewCompoList` response (field offsets and lengths)
-- **Routine ID bytes** for `RoutiContrStartRoutiCompoProte` (the `0x31 01 XX XX` payload)
+**Summary of confirmed addresses:**
 
-Workaround: empirical DID scanning of J533 in the `0xEA00–0xEB00` range using python-udsoncan and the ESP32 bridge will reveal which addresses respond. The `0xEA61–0xEA64` range identified above is the confirmed starting point.
+| DID | Purpose |
+|---|---|
+| `0x04A3` | Gateway Component List — primary constellation bitmap (read/write) |
+| `0x2A2A` | Allocation table — maps slot indices to ECU names. ECU Name 8 = J255. |
+| `0x2A26` | Present bitmap — which modules are online |
+| `0x2A27` | Sleep indication bitmap |
+| `0x2A28` | DTC bitmap — which modules have active faults |
+| `0x2A29` | DiagProt — transport protocol per module |
+| `0x2A2C` | TP-Identifier — CAN TX IDs per slot. J255 = `0x0746`. |
+| `0x0438–0x043E` | Theft protection counters and showroom mode |
+| `0x2CA9` | Service key 2 sampling status |
+| `0x00BE` | IKA Key (34 bytes) — the component protection key. Present on J533 and J255. |
+| `0x00BD` | GKA Key (34 bytes) — device class key on J255 only |
+
+**Security level confirmed:** All CP write services run in extended diagnostic session (`0x10 0x03`) with no SA2 seed/key challenge. The GEKO server token provides authorization at the application layer.
+
+**Reading CP state without GEKO:** Reading `0x00BE` (IKA Key) from J255 in extended session tells you definitively whether CP is active:
+- 34 zero bytes = no key installed = CP active
+- Non-zero = key is present (CP may be cleared)
+
+**The `0xEA61–0xEA64` range** identified from string mining does not appear in `EV_GatewPKOUDS_001` MWB output. It likely refers to CP status DIDs on slave modules (J255, J136) rather than J533. The confirmed J533 CP DIDs are in the `0x04A3` and `0x2Axx` ranges.
 
 ---
 

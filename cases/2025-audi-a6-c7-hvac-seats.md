@@ -88,3 +88,25 @@ The following DTC codes were confirmed from the AU57X DIDB diagnostic database (
 ---
 
 *This submission is released under CC0 (public domain).*
+
+---
+
+### Technical Investigation Update (March 2026)
+
+Active diagnostic investigation of this vehicle is in progress using a Python-based UDS probe (`j533_probe.py`) connected via an ESP32 ISO-TP BLE bridge.
+
+**Confirmed diagnostic chain from AU57X MWB extraction:**
+
+The following DID addresses are confirmed for this vehicle's platform (C7 A6, EV_GatewPKOUDS_001 gateway variant):
+
+- `0x04A3` — Gateway Component List coded bitmap. Decoding this tells us which slot index J255 occupies and whether it is currently enrolled.
+- `0x2A2A` — Allocation table. ECU Name value `8` = Air Conditioning (J255). Reading this identifies J255's slot number.
+- `0x00BE` — IKA Key on J255. 34 zero bytes = CP active, no key installed. This is the single most direct indicator of CP state.
+
+**Pending:** Physical probe run with ESP32 bridge connected to OBD port. Once complete this section will be updated with:
+- Actual constellation table showing J255 slot and status
+- IKA key state confirming CP active/inactive
+- VIN mismatch confirmation between J533 and J255
+
+**Resolution path confirmed:** CP removal requires GEKO server authentication to write a new IKA key to J255 DID `0x00BE`. Third-party option: vw-geko.com (~€30–40 per module). Dealer option: $300–500+ per module. No offline solution exists that does not involve hardware-level MCU reprogramming of J533 (CarProTool, V850 programmer).
+
