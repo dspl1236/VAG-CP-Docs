@@ -9,7 +9,7 @@
 
 ## What is Component Protection?
 
-Component Protection (Komponentenschutz) is a software-based parts-locking system used across all Volkswagen Group brands — **Volkswagen, Audi, Porsche, Bentley, Lamborghini, Škoda, SEAT, and Cupra**. It cryptographically binds electronic modules to a specific vehicle using the manufacturer's FAZIT database server. When a replacement part is installed — even a perfectly functional, identical salvage part — it will not work until a Volkswagen Group dealer uses proprietary ODIS software to perform an online authentication with VW's GEKO/GRP servers.
+Component Protection (Komponentenschutz) is a software-based parts-locking system used across all Volkswagen Group brands — **Volkswagen, Audi, Porsche, Bentley, Lamborghini, Škoda, SEAT, and Cupra**. It cryptographically binds electronic modules to a specific vehicle using the manufacturer's FAZIT database server. When a replacement part is installed — even a perfectly functional, identical salvage part — it will not work until a Volkswagen Group dealer uses proprietary ODIS software to perform an online authentication with VW's GEKO/GRP servers. The GEKO Immobilizer/CP endpoint has been **offline since at least early 2026** with no estimated return date for any VAG brand.
 
 **The result:** A $200 salvage part requires an additional $300–$500 dealer fee just to be activated, making independent repair and DIY replacement economically unviable.
 
@@ -30,7 +30,7 @@ All VW Group vehicles approximately model year 2003–present, with Generation 3
 
 ## Why does this matter?
 
-### 1. The GEKO server is in transition — and vehicles may be permanently bricked
+### 1. The GEKO server is offline — and vehicles may be permanently bricked
 
 Component Protection requires a live connection to VW's backend servers (GEKO/GRP/FAZIT) to activate any replacement module. VW is migrating this infrastructure, and third-party access has been increasingly unreliable since mid-2024. **VW has made no public commitment to long-term server availability for older vehicles.** If servers go offline without an offline alternative, millions of vehicles become permanently unserviceable with used parts.
 
