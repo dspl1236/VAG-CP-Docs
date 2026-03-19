@@ -214,7 +214,7 @@ The community research documented here establishes several important facts:
 ## C7 Platform Analysis — Why the EEPROM Swap Partially Works (and When It Fails)
 
 *This section applies the two-layer CP model confirmed from the Feb 2024 ODIS session
-on VIN WAUGGAFC7DN120188. See `j533-constellation-deep-dive.md` for the full model.*
+on VIN WAUGGA**********8. See `j533-constellation-deep-dive.md` for the full model.*
 
 The EEPROM swap approach is often described as a simple fix. The reality depends
 on which module, which gateway generation, and which layer of CP you're targeting.
@@ -295,7 +295,7 @@ platforms with OBD access, it is the inferior approach.
 | UDS + constellation update (0x04A3) | ✓ | ✓ | Yes — complete fix |
 | ABRITES VN020 (local EEPROM derivation) | ✓ if supported | ✓ | Unknown C7 coverage |
 
-*The confirmed IKA key blob for VIN WAUGGAFC7DN120188 (from Feb 2024 ODIS session):*
+*The confirmed IKA key blob for VIN WAUGGA**********8 (from Feb 2024 ODIS session):*
 ```
 E6 2B 41 D1 1C 44 AF 20 21 77 FB 1F 27 4B 0A C2
 D1 5B D2 62 E4 FD 27 AB 61 D1 23 C2 F1 5A 2C 93 26 00
