@@ -106,3 +106,21 @@ To remove Component Protection, a technician must:
 - VAG Programming (vagprogramming.com) — independent technical summary
 - MHH Auto forums — community technical research
 - Ross-Tech Forums — community documentation
+
+---
+
+## Key Confirmed Values (March 2026)
+
+| Item | Value | Status |
+|------|-------|--------|
+| CP routine ID | `0x0226` (UDS RoutineControl Start) | ✓ Extracted from ES_LIBCompoProteGen3V12.sd.db |
+| IKA key DID | `0x00BE` (34 bytes) | ✓ Confirmed from live ODIS session |
+| GKA key DID | `0x00BD` (34 bytes) | ✓ Confirmed from AU57X MWB extraction |
+| Constellation DID | `0x04A3` (10 bytes) | ✓ Before/after captured from live session |
+| GEKO server | Immobilizer/CP endpoint **OFFLINE** | ✓ Confirmed status.vw-geko.com March 2026 |
+| VW CA Root cert | 4096-bit RSA, SHA384, valid 2023–2033 | ✓ Extracted from ODIS DMS keystore |
+| GEKO server cert | 2048-bit RSA, self-signed, valid 2023–2033 | ✓ Extracted from ODIS DMS keystore |
+
+See [`geko-pki-analysis.md`](geko-pki-analysis.md) for the certificate details and
+[`au57x-mwb-extraction-confirmed-dids.md`](au57x-mwb-extraction-confirmed-dids.md)
+for the full confirmed DID map.
