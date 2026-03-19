@@ -34,7 +34,7 @@
 ### Resolution attempt
 
 **Unlock status:** Unresolved at time of submission  
-**Server status:** GEKO system in transition; third-party access unreliable  
+**Server status:** GEKO Immobilizer/CP endpoint **OFFLINE** as of March 2026, no ETA given by VW for all brands  
 **Dealer option:** Available but requires $300–$500+ per module in unlock fees, on top of cost of donor vehicle already purchased
 
 **Notable:** Owner purchased an entire second Audi A6 specifically to source OEM-identical salvage parts for cost-effective repair. Despite having perfect, matching donor parts, both modules are non-functional due to Component Protection. The total cost of acquiring the donor vehicle plus dealer CP removal fees approaches or exceeds the cost of purchasing new OEM parts — entirely defeating the purpose of the repair strategy.
@@ -108,5 +108,5 @@ The following DID addresses are confirmed for this vehicle's platform (C7 A6, EV
 - IKA key state confirming CP active/inactive
 - VIN mismatch confirmation between J533 and J255
 
-**Resolution path confirmed:** CP removal requires GEKO server authentication to write a new IKA key to J255 DID `0x00BE`. Third-party option: vw-geko.com (~€30–40 per module). Dealer option: $300–500+ per module. No offline solution exists that does not involve hardware-level MCU reprogramming of J533 (CarProTool, V850 programmer).
+**Resolution path:** GEKO server offline as of March 2026. Active research into offline IKA key write via UDS `WriteDataByIdentifier(0x00BE)` — see `cp-system-explained.md` for current status. Confirmed IKA key blob from Feb 2024 session available; hardware test pending to confirm VIN-bound vs module-bound derivation. to J255 DID `0x00BE`. Third-party option: vw-geko.com (~€30–40 per module). Dealer option: $300–500+ per module. No offline solution exists that does not involve hardware-level MCU reprogramming of J533 (CarProTool, V850 programmer).
 
