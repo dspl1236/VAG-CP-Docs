@@ -2,733 +2,523 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0a0f0a">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="theme-color" content="#07090a">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <title>VAG-CP Tool</title>
-<link rel="manifest" href="manifest.json">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;500;700&display=swap');
-
-  :root {
-    --bg:      #07090a;
-    --surface: #0d1214;
-    --border:  #1a2a1a;
-    --green:   #00e676;
-    --amber:   #ffb300;
-    --red:     #ff1744;
-    --blue:    #00b0ff;
-    --dim:     #3a4a3a;
-    --text:    #c8d8c8;
-    --mono:    'Share Tech Mono', monospace;
-    --head:    'Barlow Condensed', sans-serif;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-  }
-  body::before {
-    content: '';
-    position: fixed; inset: 0;
-    background: repeating-linear-gradient(0deg, transparent, transparent 2px,
-      rgba(0,230,118,0.012) 2px, rgba(0,230,118,0.012) 4px);
-    pointer-events: none; z-index: 1000;
-  }
-
-  header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 11px 14px 9px;
-    display: flex; align-items: center; justify-content: space-between;
-    position: sticky; top: 0; z-index: 100;
-  }
-  .logo { font-family: var(--head); font-weight: 700; font-size: 22px;
-          letter-spacing: 3px; color: var(--green); text-transform: uppercase; }
-  .logo span { color: var(--dim); font-weight: 300; }
-
-  #conn-pill {
-    font-family: var(--head); font-size: 11px; font-weight: 500;
-    letter-spacing: 2px; padding: 4px 10px; border-radius: 2px;
-    text-transform: uppercase; transition: all 0.3s;
-  }
-  #conn-pill.disconnected { background: rgba(255,23,68,.15); color: var(--red);   border: 1px solid rgba(255,23,68,.3); }
-  #conn-pill.connecting   { background: rgba(255,179,0,.15); color: var(--amber); border: 1px solid rgba(255,179,0,.3); animation: pulse 1s infinite; }
-  #conn-pill.connected    { background: rgba(0,230,118,.12); color: var(--green); border: 1px solid rgba(0,230,118,.3); }
-  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
-
-  /* secure context warning */
-  #ctx-warn {
-    background: rgba(255,179,0,.1); border-bottom: 1px solid rgba(255,179,0,.3);
-    color: var(--amber); font-size: 11px; padding: 8px 14px;
-    text-align: center; letter-spacing: .5px; display: none;
-  }
-
-  main { flex: 1; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
-  .card-head {
-    font-family: var(--head); font-size: 10px; font-weight: 500;
-    letter-spacing: 3px; text-transform: uppercase; color: var(--dim);
-    padding: 7px 13px 5px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 8px;
-  }
-  .card-head .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
-  .card-head.active .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .card-body { padding: 11px 13px; }
-
-  .btn {
-    font-family: var(--mono); font-size: 13px;
-    background: transparent; border: 1px solid var(--dim);
-    color: var(--text); padding: 11px 14px; border-radius: 3px;
-    cursor: pointer; transition: all .15s; width: 100%;
-    text-align: center; letter-spacing: 1px;
-    touch-action: manipulation; user-select: none;
-  }
-  .btn:active { transform: scale(.98); }
-  .btn.primary { border-color: var(--green); color: var(--green); }
-  .btn.primary:active { background: rgba(0,230,118,.1); }
-  .btn.danger  { border-color: var(--red);   color: var(--red); }
-  .btn.danger:active { background: rgba(255,23,68,.1); }
-  .btn.amber   { border-color: var(--amber); color: var(--amber); }
-  .btn.amber:active { background: rgba(255,179,0,.1); }
-  .btn.blue    { border-color: var(--blue);  color: var(--blue); }
-  .btn.blue:active { background: rgba(0,176,255,.1); }
-  .btn:disabled { opacity: .3; cursor: not-allowed; }
-  .btn:disabled:active { transform: none; }
-  .btn-row { display: flex; gap: 8px; }
-  .btn-row .btn { flex: 1; }
-
-  #device-name { font-size: 12px; color: var(--green); margin-bottom: 9px; min-height: 15px; }
-
-  /* tabs */
-  .tabs { display: flex; border-bottom: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .tab {
-    font-family: var(--head); font-size: 11px; font-weight: 500;
-    letter-spacing: 2px; text-transform: uppercase;
-    padding: 9px 14px; cursor: pointer; color: var(--dim);
-    border-bottom: 2px solid transparent; white-space: nowrap; flex-shrink: 0; transition: all .2s;
-  }
-  .tab.active { color: var(--green); border-bottom-color: var(--green); }
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
-
-  /* module grid */
-  .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-  .module-card {
-    background: var(--bg); border: 1px solid var(--border);
-    border-radius: 3px; padding: 9px 9px 7px; transition: border-color .3s;
-  }
-  .module-card.ok     { border-color: rgba(0,230,118,.5); }
-  .module-card.diff   { border-color: rgba(255,179,0,.5); }
-  .module-card.error  { border-color: rgba(255,23,68,.3); }
-  .module-card.active { border-color: var(--blue); }
-  .module-name {
-    font-family: var(--head); font-size: 11px; font-weight: 700;
-    letter-spacing: 2px; color: var(--dim); margin-bottom: 3px; text-transform: uppercase;
-  }
-  .module-card.ok    .module-name { color: var(--green); }
-  .module-card.diff  .module-name { color: var(--amber); }
-  .module-card.error .module-name { color: var(--red); }
-  .module-card.active .module-name { color: var(--blue); animation: pulse .8s infinite; }
-  .module-addr { font-size: 10px; color: var(--dim); margin-bottom: 5px; }
-  .module-blob { font-size: 9px; color: var(--dim); word-break: break-all; line-height: 1.5; min-height: 26px; }
-  .module-card.ok   .module-blob { color: rgba(0,230,118,.7); }
-  .module-card.diff .module-blob { color: rgba(255,179,0,.7); }
-  .module-status { font-family: var(--head); font-size: 10px; font-weight: 700; letter-spacing: 2px; margin-top: 4px; text-transform: uppercase; }
-  .module-card.ok    .module-status { color: var(--green); }
-  .module-card.diff  .module-status { color: var(--amber); }
-  .module-card.error .module-status { color: var(--red); }
-
-  #result-banner {
-    display: none; border-radius: 3px; padding: 13px;
-    font-family: var(--head); font-size: 15px; font-weight: 700;
-    letter-spacing: 2px; text-align: center; text-transform: uppercase; margin-bottom: 8px;
-  }
-  #result-banner.scenario-a { display:block; background:rgba(0,230,118,.1);  border:1px solid var(--green); color:var(--green); }
-  #result-banner.scenario-b { display:block; background:rgba(255,179,0,.1);  border:1px solid var(--amber); color:var(--amber); }
-  #result-banner.scenario-c { display:block; background:rgba(0,176,255,.1);  border:1px solid var(--blue);  color:var(--blue); }
-
-  .sep { height: 1px; background: var(--border); margin: 9px 0; }
-
-  /* LOG — full height, no text selection bleeding */
-  #log-wrap {
-    background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
-    height: calc(100dvh - 280px); min-height: 200px;
-    overflow-y: auto; overflow-x: hidden;
-    padding: 10px; -webkit-overflow-scrolling: touch;
-    user-select: text; -webkit-user-select: text;
-  }
-  #log { }
-  #log div { font-size: 11px; color: var(--dim); line-height: 1.7; word-break: break-all; }
-  #log .ok   { color: var(--green); }
-  #log .err  { color: var(--red); }
-  #log .hdr  { color: var(--blue); }
-  #log .warn { color: var(--amber); }
-
-  /* export */
-  #export-area {
-    background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
-    padding: 9px; font-size: 10px; color: var(--dim); width: 100%;
-    height: 90px; resize: none; font-family: var(--mono);
-    user-select: text; -webkit-user-select: text;
-  }
-
-  /* constellation */
-  .const-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 5px; }
-  .const-label { font-family: var(--head); font-size: 10px; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; width: 55px; flex-shrink: 0; padding-top: 2px; }
-  .const-val { font-size: 11px; color: var(--text); letter-spacing: 1px; word-break: break-all; line-height: 1.5; }
-  .const-val.changed { color: var(--green); }
-
-  /* cp status */
-  #cp-status-val {
-    font-family: var(--head); font-size: 20px; font-weight: 700;
-    letter-spacing: 3px; text-align: center; padding: 14px; text-transform: uppercase;
-  }
-  #cp-status-val.id-confirmed { color: var(--green); }
-  #cp-status-val.id-wrong     { color: var(--red); }
-  #cp-status-val.pending      { color: var(--dim); }
-  #cp-status-val.running      { color: var(--blue); animation: pulse .8s infinite; }
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;500;700&display=swap');
+:root{--bg:#07090a;--sur:#0d1214;--bdr:#1a2a1a;--grn:#00e676;--amb:#ffb300;--red:#ff1744;--blu:#00b0ff;--dim:#3a4a3a;--txt:#c8d8c8;--mono:'Share Tech Mono',monospace;--head:'Barlow Condensed',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--txt);font-family:var(--mono);font-size:13px;min-height:100dvh;display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,230,118,.012) 2px,rgba(0,230,118,.012) 4px);pointer-events:none;z-index:9999}
+header{background:var(--sur);border-bottom:1px solid var(--bdr);padding:11px 14px 9px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-family:var(--head);font-weight:700;font-size:22px;letter-spacing:3px;color:var(--grn);text-transform:uppercase}
+.logo span{color:var(--dim);font-weight:300}
+#pill{font-family:var(--head);font-size:11px;font-weight:500;letter-spacing:2px;padding:4px 10px;border-radius:2px;text-transform:uppercase;transition:all .3s}
+#pill.off{background:rgba(255,23,68,.15);color:var(--red);border:1px solid rgba(255,23,68,.3)}
+#pill.ing{background:rgba(255,179,0,.15);color:var(--amb);border:1px solid rgba(255,179,0,.3);animation:pulse 1s infinite}
+#pill.on{background:rgba(0,230,118,.12);color:var(--grn);border:1px solid rgba(0,230,118,.3)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+#warn{background:rgba(255,179,0,.1);border-bottom:1px solid rgba(255,179,0,.3);color:var(--amb);font-size:11px;padding:7px 14px;text-align:center;display:none}
+main{flex:1;padding:10px;display:flex;flex-direction:column;gap:8px}
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:4px;overflow:hidden}
+.ch{font-family:var(--head);font-size:10px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:var(--dim);padding:7px 13px 5px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:8px}
+.ch .dot{width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0}
+.ch.on .dot{background:var(--grn);box-shadow:0 0 6px var(--grn)}
+.cb{padding:11px 13px}
+.btn{font-family:var(--mono);font-size:13px;background:transparent;border:1px solid var(--dim);color:var(--txt);padding:11px 14px;border-radius:3px;cursor:pointer;transition:all .15s;width:100%;text-align:center;letter-spacing:1px;touch-action:manipulation;user-select:none;display:block}
+.btn:active{transform:scale(.97);opacity:.8}
+.btn.g{border-color:var(--grn);color:var(--grn)}
+.btn.r{border-color:var(--red);color:var(--red)}
+.btn.a{border-color:var(--amb);color:var(--amb)}
+.btn.b{border-color:var(--blu);color:var(--blu)}
+.btn:disabled{opacity:.3;pointer-events:none}
+.row{display:flex;gap:8px}
+.row .btn{flex:1}
+#dname{font-size:12px;color:var(--grn);margin-bottom:9px;min-height:15px}
+.tabs{display:flex;border-bottom:1px solid var(--bdr);overflow-x:auto}
+.tab{font-family:var(--head);font-size:11px;font-weight:500;letter-spacing:2px;text-transform:uppercase;padding:9px 14px;cursor:pointer;color:var(--dim);border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0;transition:all .2s;user-select:none;touch-action:manipulation}
+.tab.on{color:var(--grn);border-bottom-color:var(--grn)}
+.pnl{display:none;padding:11px 13px}
+.pnl.on{display:block}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.mc{background:var(--bg);border:1px solid var(--bdr);border-radius:3px;padding:9px}
+.mc.ok{border-color:rgba(0,230,118,.5)}
+.mc.df{border-color:rgba(255,179,0,.5)}
+.mc.er{border-color:rgba(255,23,68,.3)}
+.mc.ac{border-color:var(--blu)}
+.mn{font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--dim);margin-bottom:2px;text-transform:uppercase}
+.mc.ok .mn{color:var(--grn)}.mc.df .mn{color:var(--amb)}.mc.er .mn{color:var(--red)}.mc.ac .mn{color:var(--blu);animation:pulse .8s infinite}
+.ma{font-size:10px;color:var(--dim);margin-bottom:4px}
+.mb{font-size:9px;color:var(--dim);word-break:break-all;line-height:1.5;min-height:24px}
+.mc.ok .mb{color:rgba(0,230,118,.7)}.mc.df .mb{color:rgba(255,179,0,.7)}
+.ms{font-family:var(--head);font-size:10px;font-weight:700;letter-spacing:2px;margin-top:3px;text-transform:uppercase}
+.mc.ok .ms{color:var(--grn)}.mc.df .ms{color:var(--amb)}.mc.er .ms{color:var(--red)}
+#rbanner{display:none;border-radius:3px;padding:12px;font-family:var(--head);font-size:14px;font-weight:700;letter-spacing:2px;text-align:center;text-transform:uppercase;margin-bottom:8px}
+#rbanner.a{display:block;background:rgba(0,230,118,.1);border:1px solid var(--grn);color:var(--grn)}
+#rbanner.b{display:block;background:rgba(255,179,0,.1);border:1px solid var(--amb);color:var(--amb)}
+#rbanner.c{display:block;background:rgba(0,176,255,.1);border:1px solid var(--blu);color:var(--blu)}
+.sep{height:1px;background:var(--bdr);margin:9px 0}
+#logwrap{background:var(--bg);border:1px solid var(--bdr);border-radius:3px;height:calc(100dvh - 260px);min-height:180px;overflow-y:auto;padding:9px;-webkit-overflow-scrolling:touch;user-select:text;-webkit-user-select:text}
+#log div{font-size:11px;color:var(--dim);line-height:1.7;word-break:break-all}
+#log .ok{color:var(--grn)}#log .er{color:var(--red)}#log .h{color:var(--blu)}#log .w{color:var(--amb)}
+#cpval{font-family:var(--head);font-size:20px;font-weight:700;letter-spacing:3px;text-align:center;padding:14px;text-transform:uppercase}
+#cpval.ok{color:var(--grn)}#cpval.er{color:var(--red)}#cpval.pn{color:var(--dim)}#cpval.rn{color:var(--blu);animation:pulse .8s infinite}
+textarea#ea{background:var(--bg);border:1px solid var(--bdr);border-radius:3px;padding:9px;font-size:10px;color:var(--dim);width:100%;height:90px;resize:none;font-family:var(--mono);user-select:text;-webkit-user-select:text}
+.crow{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px}
+.clbl{font-family:var(--head);font-size:10px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;width:55px;flex-shrink:0;padding-top:2px}
+.cval{font-size:11px;color:var(--txt);letter-spacing:1px;word-break:break-all;line-height:1.5}
+.cval.ok{color:var(--grn)}
 </style>
 </head>
 <body>
 
 <header>
   <div class="logo">VAG<span>-</span>CP</div>
-  <div id="conn-pill" class="disconnected">OFFLINE</div>
+  <div id="pill" class="off">OFFLINE</div>
 </header>
-
-<div id="ctx-warn">
-  ⚠ Open from HTTPS for full functionality — <strong>dspl1236.github.io/VAG-CP-Docs</strong>
-</div>
+<div id="warn">⚠ Open from HTTPS for full features — dspl1236.github.io/VAG-CP-Docs</div>
 
 <main>
-
-  <!-- CONNECT -->
   <div class="card">
-    <div class="card-head" id="conn-head"><span class="dot"></span>ESP32 BLE BRIDGE</div>
-    <div class="card-body">
-      <div id="device-name">no device connected</div>
-      <div class="btn-row">
-        <button class="btn primary" id="btn-scan" onclick="handleScan()">⟳ SCAN &amp; CONNECT</button>
-        <button class="btn danger"  id="btn-disc" onclick="handleDisconnect()" disabled>✕ DISC</button>
+    <div class="ch" id="ch"><span class="dot"></span>ESP32 BLE BRIDGE</div>
+    <div class="cb">
+      <div id="dname">no device connected</div>
+      <div class="row">
+        <button class="btn g" id="bscan" onclick="doScan()">⟳ SCAN &amp; CONNECT</button>
+        <button class="btn r" id="bdisc" onclick="doDisc()" disabled>✕ DISC</button>
       </div>
     </div>
   </div>
 
-  <!-- TABS -->
   <div class="card" style="flex:1">
     <div class="tabs">
-      <div class="tab active" onclick="switchTab('ika')">🔑 IKA</div>
-      <div class="tab" onclick="switchTab('const')">⊞ CONST</div>
-      <div class="tab" onclick="switchTab('cp')">⚙ CP</div>
-      <div class="tab" onclick="switchTab('log')">◈ LOG</div>
+      <div class="tab on"  onclick="tab('ika')">🔑 IKA</div>
+      <div class="tab"     onclick="tab('con')">⊞ CONST</div>
+      <div class="tab"     onclick="tab('cp')">⚙ CP</div>
+      <div class="tab"     onclick="tab('log')">◈ LOG</div>
     </div>
 
     <!-- IKA -->
-    <div class="tab-panel active" id="panel-ika">
-      <div style="padding:11px 13px">
-        <button class="btn primary" id="btn-ika" onclick="runIKARead()" disabled>
-          🔑 READ ALL IKA KEYS (DID 0x00BE)
-        </button>
+    <div class="pnl on" id="pika">
+      <button class="btn g" id="bika" onclick="runIKA()" disabled>🔑 READ ALL IKA KEYS (DID 0x00BE)</button>
+      <div class="sep"></div>
+      <div id="rbanner"></div>
+      <div class="mgrid" id="mgrid"></div>
+      <div id="ewrap" style="display:none">
         <div class="sep"></div>
-        <div id="result-banner"></div>
-        <div class="module-grid" id="module-grid"></div>
-        <div id="export-wrap" style="display:none">
-          <div class="sep"></div>
-          <textarea id="export-area" readonly onclick="this.select()"></textarea>
-          <button class="btn" id="btn-copy" style="margin-top:7px" onclick="copyResults()">⎘ COPY RESULTS</button>
-        </div>
+        <textarea id="ea" readonly onclick="this.select()"></textarea>
+        <button class="btn" id="bcopy" style="margin-top:7px" onclick="doCopy()">⎘ COPY RESULTS</button>
       </div>
     </div>
 
     <!-- CONSTELLATION -->
-    <div class="tab-panel" id="panel-const">
-      <div style="padding:11px 13px">
-        <button class="btn blue" id="btn-const" onclick="readConstellation()" disabled>⊞ READ CONSTELLATION (0x04A3)</button>
-        <div class="sep"></div>
-        <div id="const-display">
-          <div class="const-row"><div class="const-label">RAW</div><div class="const-val" id="const-raw">—</div></div>
-          <div class="const-row"><div class="const-label">HEX</div><div class="const-val" id="const-hex">—</div></div>
-          <div style="margin-top:10px;font-size:11px;color:var(--dim);line-height:1.8">
-            <div>Before (Feb 2024):&nbsp;<span style="color:var(--amber)">FD A1 E9 0C FE 62 64 8D 00 00</span></div>
-            <div>After&nbsp; (Feb 2024):&nbsp;<span style="color:var(--green)">FD A1 E8 0C FE 62 60 0D 00 00</span></div>
-          </div>
-        </div>
-        <div class="sep"></div>
-        <button class="btn blue" id="btn-gka" onclick="readSingleDID(0x710,0x77A,0x00BD,'gka-result','J533 GKA 0x00BD')" disabled>READ GKA KEY (0x00BD)</button>
-        <div id="gka-result" style="margin-top:7px;font-size:11px;color:var(--dim);word-break:break-all;line-height:1.6"></div>
+    <div class="pnl" id="pcon">
+      <button class="btn b" id="bcon" onclick="readConst()" disabled>⊞ READ CONSTELLATION (0x04A3)</button>
+      <div class="sep"></div>
+      <div class="crow"><div class="clbl">RAW</div><div class="cval" id="craw">—</div></div>
+      <div class="crow"><div class="clbl">HEX</div><div class="cval" id="chex">—</div></div>
+      <div style="margin-top:10px;font-size:11px;color:var(--dim);line-height:1.9">
+        <div>Before Feb24: <span style="color:var(--amb)">FD A1 E9 0C FE 62 64 8D 00 00</span></div>
+        <div>After&nbsp; Feb24: <span style="color:var(--grn)">FD A1 E8 0C FE 62 60 0D 00 00</span></div>
       </div>
+      <div class="sep"></div>
+      <button class="btn b" id="bgka" onclick="readOne(0x710,0x77A,0x00BD,'gkar','J533 GKA')" disabled>READ GKA KEY (0x00BD)</button>
+      <div id="gkar" style="margin-top:7px;font-size:11px;color:var(--dim);word-break:break-all"></div>
     </div>
 
     <!-- CP CHECK -->
-    <div class="tab-panel" id="panel-cp">
-      <div style="padding:11px 13px">
-        <div id="cp-status-val" class="pending">ROUTINE 0x0226</div>
-        <div style="font-size:10px;color:var(--dim);text-align:center;margin-bottom:11px;letter-spacing:.5px">31 01 02 26 → J533</div>
-        <button class="btn amber" id="btn-cp" onclick="runCPCheck()" disabled>⟳ CHECK CP ROUTINE ID</button>
-        <div class="sep"></div>
-        <div style="font-size:11px;color:var(--dim);line-height:2">
-          <div><span style="color:var(--green)">7F 31 22</span> → ID confirmed, token required</div>
-          <div><span style="color:var(--red)">7F 31 31</span>   → Wrong routine ID</div>
-          <div><span style="color:var(--amber)">7F 31 7E</span>  → Wrong session</div>
-          <div><span style="color:var(--blue)">71 01 02 26</span> → Routine accepted</div>
-        </div>
-        <div class="sep"></div>
-        <div id="cp-raw" style="font-size:11px;color:var(--dim);min-height:18px;letter-spacing:1px"></div>
+    <div class="pnl" id="pcp">
+      <div id="cpval" class="pn">ROUTINE 0x0226</div>
+      <div style="font-size:10px;color:var(--dim);text-align:center;margin-bottom:11px">31 01 02 26 → J533</div>
+      <button class="btn a" id="bcp" onclick="runCP()" disabled>⟳ CHECK CP ROUTINE ID</button>
+      <div class="sep"></div>
+      <div style="font-size:11px;color:var(--dim);line-height:2.1">
+        <div><span style="color:var(--grn)">7F 31 22</span> → ID confirmed, token required</div>
+        <div><span style="color:var(--red)">7F 31 31</span>   → Wrong routine ID</div>
+        <div><span style="color:var(--amb)">7F 31 7E</span>  → Wrong session</div>
+        <div><span style="color:var(--blu)">71 01 02 26</span> → Routine accepted</div>
       </div>
+      <div class="sep"></div>
+      <div id="cpraw" style="font-size:11px;color:var(--dim);min-height:16px;letter-spacing:1px"></div>
     </div>
 
     <!-- LOG -->
-    <div class="tab-panel" id="panel-log">
-      <div style="padding:11px 13px">
-        <div id="log-wrap"><div id="log"></div></div>
-        <button class="btn" style="margin-top:8px" onclick="clearLog()">✕ CLEAR</button>
-      </div>
+    <div class="pnl" id="plog">
+      <div id="logwrap"><div id="log"></div></div>
+      <button class="btn" style="margin-top:8px" onclick="clearLog()">✕ CLEAR</button>
     </div>
   </div>
-
 </main>
 
 <script>
-// ── Constants ─────────────────────────────────────────────────────────────────
-const SVC_UUID   = '0000abf0-0000-1000-8000-00805f9b34fb';
-const CHAR_WRITE = '0000abf1-0000-1000-8000-00805f9b34fb';
-const CHAR_NTFY  = '0000abf2-0000-1000-8000-00805f9b34fb';
-const HDR_ID     = 0xF1;
-const HDR_SZ     = 8;
+'use strict';
 
-const MODULES = [
-  { name:'J533', desc:'Gateway',     tx:0x710, rx:0x77A },
-  { name:'J255', desc:'Climatronic', tx:0x746, rx:0x7AE },
-  { name:'J285', desc:'Instruments', tx:0x720, rx:0x728 },
-  { name:'J234', desc:'Airbag',      tx:0x736, rx:0x73E },
-  { name:'J794', desc:'MMI',         tx:0x7C0, rx:0x7C8 },
-  { name:'J136', desc:'Mem.Seat',    tx:0x714, rx:0x77C },
+// ── Constants ──────────────────────────────────────────────────────────────
+const SVC  = '0000abf0-0000-1000-8000-00805f9b34fb';
+const CW   = '0000abf1-0000-1000-8000-00805f9b34fb';
+const CN   = '0000abf2-0000-1000-8000-00805f9b34fb';
+const H_ID = 0xF1;
+const H_SZ = 8;
+const KNOWN = 'e62b41d11c44af202177fb1f274b0ac2d15bd262e4fd27ab61d123c2f15a2c932600';
+
+const MODS = [
+  {n:'J533',d:'Gateway',    tx:0x710,rx:0x77A},
+  {n:'J255',d:'Climatronic',tx:0x746,rx:0x7AE},
+  {n:'J285',d:'Instruments',tx:0x720,rx:0x728},
+  {n:'J234',d:'Airbag',     tx:0x736,rx:0x73E},
+  {n:'J794',d:'MMI',        tx:0x7C0,rx:0x7C8},
+  {n:'J136',d:'Mem.Seat',   tx:0x714,rx:0x77C},
 ];
 
-const KNOWN_BLOB = 'e62b41d11c44af202177fb1f274b0ac2d15bd262e4fd27ab61d123c2f15a2c932600';
+// ── BLE state ──────────────────────────────────────────────────────────────
+let gDev=null, gSrv=null, gWc=null, gNc=null;
+let rxQ=[], rxR=[];
 
-// ── BLE state ─────────────────────────────────────────────────────────────────
-let bleDevice = null;
-let bleServer = null;
-let writeChar = null;
-let ntfyChar  = null;
-let rxResolvers = [];
-let rxQueue     = [];
-let notifyReady = false;   // flag: notifications subscribed and stable
-
-// ── UI ────────────────────────────────────────────────────────────────────────
-function switchTab(name) {
-  const names = ['ika','const','cp','log'];
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='panel-'+name));
-}
-
-function log(msg, cls='') {
-  const wrap = document.getElementById('log-wrap');
-  const el   = document.getElementById('log');
-  const d = document.createElement('div');
-  if (cls) d.className = cls;
-  d.textContent = '> ' + msg;
-  el.appendChild(d);
-  wrap.scrollTop = wrap.scrollHeight;
-}
-
-function clearLog() { document.getElementById('log').innerHTML = ''; }
-
-function setConn(state, name) {
-  const pill = document.getElementById('conn-pill');
-  const head = document.getElementById('conn-head');
-  const dname= document.getElementById('device-name');
-  if (state === 'connected') {
-    pill.className='connected'; pill.textContent='ONLINE';
-    head.className='card-head active';
-    dname.textContent = name || 'BLE_TO_ISOTP20';
-    document.getElementById('btn-scan').disabled = true;
-    document.getElementById('btn-disc').disabled = false;
-    ['btn-ika','btn-const','btn-cp','btn-gka'].forEach(id=>{
-      const e=document.getElementById(id); if(e) e.disabled=false;
-    });
-  } else if (state === 'connecting') {
-    pill.className='connecting'; pill.textContent='LINKING…';
-    document.getElementById('btn-scan').disabled = true;
-  } else {
-    pill.className='disconnected'; pill.textContent='OFFLINE';
-    head.className='card-head';
-    dname.textContent='no device connected';
-    document.getElementById('btn-scan').disabled = false;
-    document.getElementById('btn-disc').disabled = true;
-    ['btn-ika','btn-const','btn-cp','btn-gka'].forEach(id=>{
-      const e=document.getElementById(id); if(e) e.disabled=true;
-    });
-    notifyReady = false;
-    writeChar = null; ntfyChar = null;
-  }
-}
-
-// Check secure context
-window.addEventListener('load', () => {
-  if (!window.isSecureContext) {
-    document.getElementById('ctx-warn').style.display = 'block';
-    log('⚠ Not a secure context — open dspl1236.github.io/VAG-CP-Docs in Chrome', 'warn');
-  }
-  buildModuleGrid();
-  log('VAG-CP Tool v2 ready', 'ok');
-});
-
-// ── BLE protocol ──────────────────────────────────────────────────────────────
-function makeHeader(txId, rxId, payLen) {
-  const b = new ArrayBuffer(HDR_SZ);
-  const v = new DataView(b);
-  v.setUint8(0, HDR_ID);
-  v.setUint8(1, 0x00);
-  v.setUint16(2, rxId, true);
-  v.setUint16(4, txId, true);
-  v.setUint16(6, payLen, true);
-  return new Uint8Array(b);
-}
-
-function sendFrame(txId, rxId, udsBytes) {
-  if (!writeChar) throw new Error('not connected');
-  const hdr = makeHeader(txId, rxId, udsBytes.length);
-  const pkt = new Uint8Array(HDR_SZ + udsBytes.length);
-  pkt.set(hdr, 0);
-  pkt.set(udsBytes, HDR_SZ);
-  // Use writeValue (with response) — more reliable on Android + ESP32
-  // Falls back to writeValueWithoutResponse if not supported
-  try {
-    return await writeChar.writeValue(pkt);
-  } catch(e) {
-    if (e.name === 'NotSupportedError' || e.message.includes('without response')) {
-      return await writeChar.writeValueWithoutResponse(pkt);
-    }
-    throw e;
-  }
-}
-
-function onNotify(evt) {
-  const raw = new Uint8Array(evt.target.value.buffer);
-  let offset = 0;
-  while (offset < raw.length) {
-    if (raw[offset] !== HDR_ID) { offset++; continue; }
-    if (offset + HDR_SZ > raw.length) break;
-    const v    = new DataView(raw.buffer, offset);
-    const sz   = v.getUint16(6, true);
-    offset += HDR_SZ;
-    if (offset + sz > raw.length) break;
-    const payload = Array.from(raw.slice(offset, offset + sz));
-    offset += sz;
-    if (rxResolvers.length > 0) {
-      rxResolvers.shift()(payload);
-    } else {
-      rxQueue.push(payload);
-    }
-  }
-}
-
-function waitResp(ms = 6000) {
-  return new Promise((res, rej) => {
-    if (rxQueue.length > 0) { res(rxQueue.shift()); return; }
-    const t = setTimeout(() => {
-      rxResolvers = rxResolvers.filter(r => r !== res);
-      rej(new Error('timeout'));
-    }, ms);
-    rxResolvers.push(v => { clearTimeout(t); res(v); });
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function tab(name) {
+  ['ika','con','cp','log'].forEach((n,i) => {
+    document.querySelectorAll('.tab')[i].className = 'tab' + (n===name?' on':'');
+    document.getElementById('p'+n).className = 'pnl' + (n===name?' on':'');
   });
 }
 
-async function udsExchange(txId, rxId, reqBytes, ms=6000) {
-  rxQueue = []; rxResolvers = [];           // flush stale
-  await sendFrame(txId, rxId, reqBytes);
-  return waitResp(ms);
+function lg(msg, cls='') {
+  const wrap = document.getElementById('logwrap');
+  const el   = document.getElementById('log');
+  const d = document.createElement('div');
+  if(cls) d.className=cls;
+  d.textContent='> '+msg;
+  el.appendChild(d);
+  wrap.scrollTop=wrap.scrollHeight;
 }
 
-function hexStr(arr) { return arr.map(b=>b.toString(16).padStart(2,'0')).join(' ').toUpperCase(); }
-function hexCompact(arr) { return arr.map(b=>b.toString(16).padStart(2,'0')).join('').toLowerCase(); }
+function clearLog(){ document.getElementById('log').innerHTML=''; }
 
-async function extSession(txId, rxId) {
-  const r = await udsExchange(txId, rxId, [0x10, 0x03]);
-  if (r[0] !== 0x50) throw new Error('session NRC:' + r[2]?.toString(16));
+function setUI(state, name) {
+  const pill=document.getElementById('pill');
+  const ch=document.getElementById('ch');
+  const dn=document.getElementById('dname');
+  const btns=['bika','bcon','bcp','bgka'];
+  if(state==='on'){
+    pill.className='pill on'; pill.textContent='ONLINE';
+    ch.className='ch on';
+    dn.textContent=name||'BLE_TO_ISOTP20';
+    document.getElementById('bscan').disabled=true;
+    document.getElementById('bdisc').disabled=false;
+    btns.forEach(id=>{ const e=document.getElementById(id); if(e) e.disabled=false; });
+  } else if(state==='ing'){
+    pill.className='pill ing'; pill.textContent='LINKING…';
+    document.getElementById('bscan').disabled=true;
+  } else {
+    pill.className='pill off'; pill.textContent='OFFLINE';
+    ch.className='ch';
+    dn.textContent='no device connected';
+    document.getElementById('bscan').disabled=false;
+    document.getElementById('bdisc').disabled=true;
+    btns.forEach(id=>{ const e=document.getElementById(id); if(e) e.disabled=true; });
+    gWc=null; gNc=null; gSrv=null;
+  }
 }
 
-async function readDIDraw(txId, rxId, did) {
-  const hi = (did>>8)&0xFF, lo = did&0xFF;
-  const r = await udsExchange(txId, rxId, [0x22, hi, lo]);
-  if (r[0] === 0x7F) throw new Error(`NRC 0x${r[2]?.toString(16).toUpperCase()}`);
-  if (r[0] !== 0x62) throw new Error(`unexpected: ${hexStr(r)}`);
+// ── Notification handler ───────────────────────────────────────────────────
+function onNtfy(evt) {
+  const raw=new Uint8Array(evt.target.value.buffer);
+  let off=0;
+  while(off<raw.length){
+    if(raw[off]!==H_ID){off++;continue;}
+    if(off+H_SZ>raw.length) break;
+    const v=new DataView(raw.buffer,off);
+    const sz=v.getUint16(6,true);
+    off+=H_SZ;
+    if(off+sz>raw.length) break;
+    const pay=Array.from(raw.slice(off,off+sz));
+    off+=sz;
+    if(rxR.length>0) rxR.shift()(pay);
+    else rxQ.push(pay);
+  }
+}
+
+// ── Wait for one response ──────────────────────────────────────────────────
+function wait(ms=7000){
+  return new Promise((res,rej)=>{
+    if(rxQ.length>0){res(rxQ.shift());return;}
+    const t=setTimeout(()=>{
+      rxR=rxR.filter(r=>r!==res);
+      rej(new Error('timeout'));
+    },ms);
+    rxR.push(v=>{clearTimeout(t);res(v);});
+  });
+}
+
+// ── Send a UDS frame ───────────────────────────────────────────────────────
+async function send(txId,rxId,uds){
+  if(!gWc) throw new Error('not connected');
+  const hdr=new Uint8Array(H_SZ);
+  const dv=new DataView(hdr.buffer);
+  dv.setUint8(0,H_ID); dv.setUint8(1,0);
+  dv.setUint16(2,rxId,true); dv.setUint16(4,txId,true);
+  dv.setUint16(6,uds.length,true);
+  const pkt=new Uint8Array(H_SZ+uds.length);
+  pkt.set(hdr); pkt.set(uds,H_SZ);
+  // Try write with response first (more reliable on Android)
+  try {
+    await gWc.writeValue(pkt);
+  } catch(e) {
+    await gWc.writeValueWithoutResponse(pkt);
+  }
+}
+
+// ── UDS exchange ──────────────────────────────────────────────────────────
+async function uds(txId,rxId,req,ms=7000){
+  rxQ=[]; rxR=[];
+  await send(txId,rxId,new Uint8Array(req));
+  return wait(ms);
+}
+
+function h2s(a){return a.map(b=>b.toString(16).padStart(2,'0')).join(' ').toUpperCase();}
+function h2c(a){return a.map(b=>b.toString(16).padStart(2,'0')).join('');}
+
+// ── UDS helpers ───────────────────────────────────────────────────────────
+async function extSess(tx,rx){
+  const r=await uds(tx,rx,[0x10,0x03]);
+  if(r[0]!==0x50) throw new Error('session NRC:0x'+(r[2]||0).toString(16));
+}
+
+async function rdid(tx,rx,did){
+  const r=await uds(tx,rx,[0x22,(did>>8)&0xFF,did&0xFF]);
+  if(r[0]===0x7F) throw new Error('NRC 0x'+r[2].toString(16).toUpperCase());
+  if(r[0]!==0x62) throw new Error('got '+h2s(r).substring(0,12));
   return r.slice(3);
 }
 
-// ── Connect / Disconnect ──────────────────────────────────────────────────────
-async function handleScan() {
-  if (!navigator.bluetooth) {
-    alert('Web Bluetooth not available.\n\nOpen this page in Chrome:\nhttps://dspl1236.github.io/VAG-CP-Docs/');
+// ── Auto-reconnect ─────────────────────────────────────────────────────────
+async function ensureConn(){
+  if(gSrv&&gSrv.connected&&gWc) return;
+  if(!gDev) throw new Error('no device');
+  lg('Reconnecting…','w');
+  gSrv=await gDev.gatt.connect();
+  const s=await gSrv.getPrimaryService(SVC);
+  gWc=await s.getCharacteristic(CW);
+  gNc=await s.getCharacteristic(CN);
+  gNc.addEventListener('characteristicvaluechanged',onNtfy);
+  await gNc.startNotifications();
+  await delay(1200);
+  lg('Reconnected','ok');
+}
+
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ── Connect ────────────────────────────────────────────────────────────────
+async function doScan(){
+  if(!navigator.bluetooth){
+    alert('Web Bluetooth not available.\n\nUse Chrome and open:\nhttps://dspl1236.github.io/VAG-CP-Docs/\n\nAlso enable Location permission for Chrome.');
     return;
   }
-  try {
-    setConn('connecting');
-    log('Scanning for 0xABF0…', 'hdr');
-    bleDevice = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [SVC_UUID] }],
-      optionalServices: [SVC_UUID]
+  try{
+    setUI('ing');
+    lg('Scanning for 0xABF0…','h');
+    gDev=await navigator.bluetooth.requestDevice({
+      filters:[{services:[SVC]}],
+      optionalServices:[SVC]
     });
-    bleDevice.addEventListener('gattserverdisconnected', onBLEDisconnect);
-
-    log(`Found: ${bleDevice.name}`, 'ok');
-    bleServer = await bleDevice.gatt.connect();
-    const svc = await bleServer.getPrimaryService(SVC_UUID);
-    writeChar  = await svc.getCharacteristic(CHAR_WRITE);
-    ntfyChar   = await svc.getCharacteristic(CHAR_NTFY);
-
-    ntfyChar.addEventListener('characteristicvaluechanged', onNotify);
-    await ntfyChar.startNotifications();
-
-    // ★ KEY FIX: wait for BLE stack to stabilise after startNotifications
-    log('BLE stack settling…');
-    await new Promise(r => setTimeout(r, 1500));
-    notifyReady = true;
-
-    log(`Connected: ${bleDevice.name}`, 'ok');
-    setConn('connected', bleDevice.name);
-  } catch(e) {
-    log(`Connect failed: ${e.message}`, 'err');
-    setConn('disconnected');
+    gDev.addEventListener('gattserverdisconnected',()=>{
+      lg('BLE disconnected','w');
+      setUI('off');
+    });
+    lg('Found: '+gDev.name,'ok');
+    gSrv=await gDev.gatt.connect();
+    const s=await gSrv.getPrimaryService(SVC);
+    gWc=await s.getCharacteristic(CW);
+    gNc=await s.getCharacteristic(CN);
+    gNc.addEventListener('characteristicvaluechanged',onNtfy);
+    await gNc.startNotifications();
+    lg('Notifications subscribed, settling…');
+    await delay(1200);
+    lg('Connected: '+gDev.name,'ok');
+    setUI('on',gDev.name);
+  }catch(e){
+    lg('Connect failed: '+e.message,'er');
+    setUI('off');
   }
 }
 
-function onBLEDisconnect() {
-  log('BLE disconnected', 'warn');
-  setConn('disconnected');
-  bleServer = null;
+async function doDisc(){
+  if(gDev&&gDev.gatt.connected) gDev.gatt.disconnect();
+  setUI('off');
 }
 
-async function handleDisconnect() {
-  if (bleDevice?.gatt?.connected) bleDevice.gatt.disconnect();
-  setConn('disconnected');
-}
-
-// ── Auto-reconnect helper ─────────────────────────────────────────────────────
-async function ensureConnected() {
-  if (bleServer?.connected && writeChar && notifyReady) return;
-  if (!bleDevice) throw new Error('no device — scan first');
-  log('Reconnecting…', 'warn');
-  bleServer = await bleDevice.gatt.connect();
-  const svc = await bleServer.getPrimaryService(SVC_UUID);
-  writeChar  = await svc.getCharacteristic(CHAR_WRITE);
-  ntfyChar   = await svc.getCharacteristic(CHAR_NTFY);
-  ntfyChar.addEventListener('characteristicvaluechanged', onNotify);
-  await ntfyChar.startNotifications();
-  await new Promise(r => setTimeout(r, 1500));
-  notifyReady = true;
-  log('Reconnected', 'ok');
-}
-
-// ── Module grid ───────────────────────────────────────────────────────────────
-function buildModuleGrid() {
-  const grid = document.getElementById('module-grid');
-  grid.innerHTML = '';
-  MODULES.forEach(m => {
-    const c = document.createElement('div');
-    c.className='module-card'; c.id=`mod-${m.name}`;
-    c.innerHTML=`
-      <div class="module-name">${m.name}</div>
-      <div class="module-addr">${m.desc}</div>
-      <div class="module-blob" id="blob-${m.name}">—</div>
-      <div class="module-status" id="mst-${m.name}"></div>`;
-    grid.appendChild(c);
+// ── Build module grid ──────────────────────────────────────────────────────
+function buildGrid(){
+  const g=document.getElementById('mgrid');
+  g.innerHTML='';
+  MODS.forEach(m=>{
+    const c=document.createElement('div');
+    c.className='mc'; c.id='mc-'+m.n;
+    c.innerHTML=`<div class="mn">${m.n}</div><div class="ma">${m.d}</div><div class="mb" id="mb-${m.n}">—</div><div class="ms" id="ms-${m.n}"></div>`;
+    g.appendChild(c);
   });
 }
 
-// ── IKA key read ──────────────────────────────────────────────────────────────
-async function runIKARead() {
-  const btn = document.getElementById('btn-ika');
+// ── IKA read ───────────────────────────────────────────────────────────────
+async function runIKA(){
+  const btn=document.getElementById('bika');
   btn.disabled=true; btn.textContent='⟳ READING…';
-  buildModuleGrid();
-  document.getElementById('result-banner').className='';
-  document.getElementById('export-wrap').style.display='none';
-  switchTab('ika');
-  log('── IKA Key Read ──', 'hdr');
+  buildGrid();
+  document.getElementById('rbanner').className='';
+  document.getElementById('ewrap').style.display='none';
+  tab('ika');
+  lg('── IKA Key Read ──','h');
 
-  const results = {};
-  for (const mod of MODULES) {
-    const card = document.getElementById(`mod-${mod.name}`);
-    card.className='module-card active';
-    document.getElementById(`mst-${mod.name}`).textContent='reading…';
-    log(`${mod.name} TX:${mod.tx.toString(16)} RX:${mod.rx.toString(16)}`);
-
-    try {
-      await ensureConnected();
-      await extSession(mod.tx, mod.rx);
-      const data  = await readDIDraw(mod.tx, mod.rx, 0x00BE);
-      const hex   = hexCompact(data);
-      const match = hex === KNOWN_BLOB;
-      results[mod.name] = hex;
-      document.getElementById(`blob-${mod.name}`).textContent = hexStr(data);
-      card.className = `module-card ${match ? 'ok' : 'diff'}`;
-      document.getElementById(`mst-${mod.name}`).textContent = match ? '✓ KNOWN' : '• DIFFERENT';
-      log(`${mod.name}: ${hex.substring(0,16)}…`, 'ok');
-    } catch(e) {
-      results[mod.name] = null;
-      card.className='module-card error';
-      document.getElementById(`blob-${mod.name}`).textContent = e.message;
-      document.getElementById(`mst-${mod.name}`).textContent='ERROR';
-      log(`${mod.name}: ${e.message}`, 'err');
+  const res={};
+  for(const m of MODS){
+    document.getElementById('mc-'+m.n).className='mc ac';
+    document.getElementById('ms-'+m.n).textContent='reading…';
+    lg(m.n+' TX:'+m.tx.toString(16)+' RX:'+m.rx.toString(16));
+    try{
+      await ensureConn();
+      await extSess(m.tx,m.rx);
+      const d=await rdid(m.tx,m.rx,0x00BE);
+      const hx=h2c(d);
+      res[m.n]=hx;
+      document.getElementById('mb-'+m.n).textContent=h2s(d);
+      const same=hx===KNOWN;
+      document.getElementById('mc-'+m.n).className='mc '+(same?'ok':'df');
+      document.getElementById('ms-'+m.n).textContent=same?'✓ KNOWN':'• DIFFERENT';
+      lg(m.n+': '+hx.substring(0,16)+'…','ok');
+    }catch(e){
+      res[m.n]=null;
+      document.getElementById('mc-'+m.n).className='mc er';
+      document.getElementById('mb-'+m.n).textContent=e.message;
+      document.getElementById('ms-'+m.n).textContent='ERROR';
+      lg(m.n+': '+e.message,'er');
     }
-    await new Promise(r => setTimeout(r, 600)); // gap between modules
+    await delay(500);
   }
 
-  // Result analysis
-  const blobs  = Object.values(results).filter(v=>v!==null);
-  const unique = new Set(blobs);
-  const banner = document.getElementById('result-banner');
-  if (unique.size === 1) {
-    banner.className='scenario-a';
+  const blobs=Object.values(res).filter(v=>v);
+  const uniq=new Set(blobs);
+  const banner=document.getElementById('rbanner');
+  if(blobs.length===0){
+    banner.className='c';
+    banner.textContent='◈ ALL READS FAILED — CHECK IGNITION + OBD';
+    lg('Checklist:','er');
+    lg('1. Key to position II (ignition on)','w');
+    lg('2. ESP32 firmly seated in OBD port','w');
+    lg('3. Use HTTPS URL in Chrome','w');
+  } else if(uniq.size===1){
+    banner.className='a';
     banner.textContent='✓ SCENARIO A — ALL IDENTICAL · VIN-BOUND';
-    log('All modules identical → VIN-bound key confirmed', 'ok');
-    log('Write E62B41D1… to J255 DID 0x00BE to clear CP', 'ok');
-  } else if (unique.size === 2) {
-    banner.className='scenario-b';
+    lg('All modules identical → VIN-bound key','ok');
+    lg('Write E62B41D1… to J255 0x00BE → CP cleared','ok');
+  } else if(uniq.size===2){
+    banner.className='b';
     banner.textContent='⚠ SCENARIO B — 2 VARIANTS · PATTERN NEEDED';
-    log(`2 distinct blobs → per-module-type derivation`, 'warn');
-  } else if (unique.size > 2) {
-    banner.className='scenario-c';
-    banner.textContent=`◈ SCENARIO C — ${unique.size} VARIANTS · PER-SERIAL`;
-    log(`${unique.size} distinct blobs → per-serial derivation`, 'warn');
+    lg('2 distinct blobs → type-bound derivation','w');
   } else {
-    banner.className='scenario-c';
-    banner.textContent='◈ ALL READS FAILED — CHECK CONNECTION';
-    log('All reads failed. Checklist:', 'err');
-    log('1. Ignition ON (key in, engine not required)', 'warn');
-    log('2. ESP32 firmly seated in OBD port', 'warn');
-    log('3. Try from HTTPS: dspl1236.github.io/VAG-CP-Docs', 'warn');
+    banner.className='c';
+    banner.textContent='◈ SCENARIO C — '+uniq.size+' VARIANTS · PER-SERIAL';
+    lg(uniq.size+' distinct blobs → serial-bound','w');
   }
 
-  // Export text
-  let txt = `VAG-CP IKA Key Read — ${new Date().toISOString()}\nKnown blob: ${KNOWN_BLOB}\n\n`;
-  for (const [name, blob] of Object.entries(results))
-    txt += `${name}: ${blob || 'ERROR'}\n`;
-  txt += `\nResult: ${banner.textContent}`;
-
-  const area = document.getElementById('export-area');
-  area.value = txt;
-  document.getElementById('export-wrap').style.display='';
+  let txt='VAG-CP IKA Key Read — '+new Date().toISOString()+'\nKnown blob: '+KNOWN+'\n\n';
+  for(const [k,v] of Object.entries(res)) txt+=k+': '+(v||'ERROR')+'\n';
+  txt+='\nResult: '+banner.textContent;
+  document.getElementById('ea').value=txt;
+  document.getElementById('ewrap').style.display='';
 
   btn.disabled=false; btn.textContent='🔑 READ ALL IKA KEYS (DID 0x00BE)';
 }
 
-function copyResults() {
-  const txt = document.getElementById('export-area').value;
-  const btn = document.getElementById('btn-copy');
-
-  // Try modern clipboard API first, fall back to execCommand
-  const finish = (ok) => {
-    btn.textContent = ok ? '✓ COPIED' : '✓ SELECTED';
-    setTimeout(() => { btn.textContent = '⎘ COPY RESULTS'; }, 2500);
-  };
-
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(txt).then(() => finish(true)).catch(() => {
-      selectFallback(finish);
+// ── Copy ───────────────────────────────────────────────────────────────────
+function doCopy(){
+  const txt=document.getElementById('ea').value;
+  const btn=document.getElementById('bcopy');
+  const done=ok=>{btn.textContent=ok?'✓ COPIED':'✓ SELECTED';setTimeout(()=>btn.textContent='⎘ COPY RESULTS',2500);};
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(txt).then(()=>done(true)).catch(()=>{
+      document.getElementById('ea').select(); done(false);
     });
   } else {
-    selectFallback(finish);
+    document.getElementById('ea').select();
+    try{document.execCommand('copy');done(true);}catch(e){done(false);}
   }
 }
 
-function selectFallback(cb) {
-  const area = document.getElementById('export-area');
-  area.focus();
-  area.select();
-  try {
-    document.execCommand('copy');
-    cb(true);
-  } catch(e) {
-    cb(false); // at least it's selected, user can long-press → copy
-  }
-}
-
-// ── Constellation read ────────────────────────────────────────────────────────
-async function readConstellation() {
-  const btn = document.getElementById('btn-const');
+// ── Constellation ──────────────────────────────────────────────────────────
+async function readConst(){
+  const btn=document.getElementById('bcon');
   btn.disabled=true; btn.textContent='⟳ READING…';
-  log('Reading J533 DID 0x04A3…', 'hdr');
-  try {
-    await ensureConnected();
-    await extSession(0x710, 0x77A);
-    const data = await readDIDraw(0x710, 0x77A, 0x04A3);
-    const hex  = hexStr(data);
-    const cmp  = hexCompact(data);
-    document.getElementById('const-raw').textContent = cmp;
-    document.getElementById('const-hex').textContent = hex;
-    if (cmp === 'fda1e80cfe62600d0000') {
-      document.getElementById('const-hex').className='const-val changed';
-      log('Matches post-Feb2024 constellation ✓', 'ok');
-    } else {
-      log(`Constellation: ${hex}`, 'ok');
-    }
-  } catch(e) { log(`Constellation: ${e.message}`, 'err'); }
+  lg('Reading J533 DID 0x04A3…','h');
+  try{
+    await ensureConn();
+    await extSess(0x710,0x77A);
+    const d=await rdid(0x710,0x77A,0x04A3);
+    document.getElementById('craw').textContent=h2c(d);
+    const hx=h2s(d);
+    document.getElementById('chex').textContent=hx;
+    if(h2c(d)==='fda1e80cfe62600d0000'){
+      document.getElementById('chex').className='cval ok';
+      lg('Matches post-Feb2024 ✓','ok');
+    } else lg('Constellation: '+hx,'ok');
+  }catch(e){lg('Constellation: '+e.message,'er');}
   btn.disabled=false; btn.textContent='⊞ READ CONSTELLATION (0x04A3)';
 }
 
-// ── Generic single DID read ───────────────────────────────────────────────────
-async function readSingleDID(txId, rxId, did, elId, label) {
-  log(`Reading ${label}…`, 'hdr');
-  try {
-    await ensureConnected();
-    await extSession(txId, rxId);
-    const data = await readDIDraw(txId, rxId, did);
-    const hex  = hexStr(data);
-    const el   = document.getElementById(elId);
-    if (el) { el.style.color='var(--green)'; el.textContent=hex; }
-    log(`${label}: ${hex}`, 'ok');
-  } catch(e) {
-    const el = document.getElementById(elId);
-    if (el) { el.style.color='var(--red)'; el.textContent=e.message; }
-    log(`${label}: ${e.message}`, 'err');
+// ── Single DID read ────────────────────────────────────────────────────────
+async function readOne(tx,rx,did,elId,label){
+  lg('Reading '+label+'…','h');
+  try{
+    await ensureConn();
+    await extSess(tx,rx);
+    const d=await rdid(tx,rx,did);
+    const el=document.getElementById(elId);
+    if(el){el.style.color='var(--grn)';el.textContent=h2s(d);}
+    lg(label+': '+h2s(d),'ok');
+  }catch(e){
+    const el=document.getElementById(elId);
+    if(el){el.style.color='var(--red)';el.textContent=e.message;}
+    lg(label+': '+e.message,'er');
   }
 }
 
-// ── CP routine check ──────────────────────────────────────────────────────────
-async function runCPCheck() {
-  const btn = document.getElementById('btn-cp');
-  const statusEl = document.getElementById('cp-status-val');
-  const rawEl    = document.getElementById('cp-raw');
-  btn.disabled=true; statusEl.className='running';
-  statusEl.textContent='SENDING…'; rawEl.textContent='';
-  log('CP routine 31 01 02 26 → J533', 'hdr');
-  try {
-    await ensureConnected();
-    await extSession(0x710, 0x77A);
-    const r = await udsExchange(0x710, 0x77A, [0x31, 0x01, 0x02, 0x26]);
-    const hex = hexStr(r);
-    rawEl.textContent = 'Response: ' + hex;
-    log(`CP response: ${hex}`, r[0]===0x7F?'warn':'ok');
-    if (r[0]===0x7F && r[1]===0x31 && r[2]===0x22) {
-      statusEl.className='id-confirmed'; statusEl.textContent='✓ ID CONFIRMED';
-      log('0x0226 confirmed — conditionsNotCorrect', 'ok');
-    } else if (r[0]===0x7F && r[2]===0x31) {
-      statusEl.className='id-wrong'; statusEl.textContent='✗ WRONG ID';
-      log('requestOutOfRange — wrong routine ID', 'err');
-    } else if (r[0]===0x71) {
-      statusEl.className='id-confirmed'; statusEl.textContent='✓ ACCEPTED';
-      log('Routine accepted', 'ok');
-    } else {
-      statusEl.className='pending'; statusEl.textContent=hex;
+// ── CP routine check ───────────────────────────────────────────────────────
+async function runCP(){
+  const btn=document.getElementById('bcp');
+  const sv=document.getElementById('cpval');
+  const rv=document.getElementById('cpraw');
+  btn.disabled=true; sv.className='rn'; sv.textContent='SENDING…'; rv.textContent='';
+  lg('CP routine 31 01 02 26 → J533','h');
+  try{
+    await ensureConn();
+    await extSess(0x710,0x77A);
+    const r=await uds(0x710,0x77A,[0x31,0x01,0x02,0x26]);
+    const hx=h2s(r);
+    rv.textContent='Response: '+hx;
+    lg('CP: '+hx,r[0]===0x7F?'w':'ok');
+    if(r[0]===0x7F&&r[1]===0x31&&r[2]===0x22){
+      sv.className='ok'; sv.textContent='✓ ID CONFIRMED';
+      lg('0x0226 confirmed — conditionsNotCorrect','ok');
+    }else if(r[0]===0x7F&&r[2]===0x31){
+      sv.className='er'; sv.textContent='✗ WRONG ID';
+    }else if(r[0]===0x71){
+      sv.className='ok'; sv.textContent='✓ ACCEPTED';
+    }else{
+      sv.className='pn'; sv.textContent=hx;
     }
-  } catch(e) {
-    statusEl.className='id-wrong'; statusEl.textContent='ERROR';
-    rawEl.textContent=e.message; log(`CP check: ${e.message}`, 'err');
+  }catch(e){
+    sv.className='er'; sv.textContent='ERROR';
+    rv.textContent=e.message; lg('CP: '+e.message,'er');
   }
   btn.disabled=false;
 }
+
+// ── Init ───────────────────────────────────────────────────────────────────
+buildGrid();
+if(!window.isSecureContext) document.getElementById('warn').style.display='block';
+lg('VAG-CP Tool v4 ready','ok');
+if(!navigator.bluetooth) lg('Web Bluetooth not detected — use Chrome','er');
 </script>
 </body>
 </html>
