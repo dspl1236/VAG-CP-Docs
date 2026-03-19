@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0f0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>VAG-CP Tool</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;500;700&display=swap');
+
+  :root {
+    --bg:       #07090a;
+    --surface:  #0d1214;
+    --border:   #1a2a1a;
+    --green:    #00e676;
+    --amber:    #ffb300;
+    --red:      #ff1744;
+    --blue:     #00b0ff;
+    --dim:      #3a4a3a;
+    --text:     #c8d8c8;
+    --mono:     'Share Tech Mono', monospace;
+    --head:     'Barlow Condensed', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* ── scanline overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,230,118,0.015) 2px,
+      rgba(0,230,118,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* ── header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--head);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 3px;
+    color: var(--green);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--dim); font-weight: 300; }
+
+  #conn-pill {
+    font-family: var(--head);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    padding: 4px 10px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    transition: all 0.3s;
+  }
+  #conn-pill.disconnected { background: rgba(255,23,68,0.15); color: var(--red); border: 1px solid rgba(255,23,68,0.3); }
+  #conn-pill.connecting   { background: rgba(255,179,0,0.15); color: var(--amber); border: 1px solid rgba(255,179,0,0.3); animation: pulse 1s infinite; }
+  #conn-pill.connected    { background: rgba(0,230,118,0.12); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.5 } }
+
+  /* ── main layout ── */
+  main { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* ── connect card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .card-head {
+    font-family: var(--head);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--dim);
+    padding: 8px 14px 6px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-head .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--dim);
+    flex-shrink: 0;
+  }
+  .card-head.active .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  .card-body { padding: 12px 14px; }
+
+  /* ── buttons ── */
+  .btn {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: transparent;
+    border: 1px solid var(--dim);
+    color: var(--text);
+    padding: 12px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+    text-align: center;
+    letter-spacing: 1px;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn.primary { border-color: var(--green); color: var(--green); }
+  .btn.primary:hover, .btn.primary:active { background: rgba(0,230,118,0.1); }
+  .btn.danger  { border-color: var(--red); color: var(--red); }
+  .btn.danger:hover, .btn.danger:active { background: rgba(255,23,68,0.1); }
+  .btn.amber   { border-color: var(--amber); color: var(--amber); }
+  .btn.amber:hover, .btn.amber:active { background: rgba(255,179,0,0.1); }
+  .btn.blue    { border-color: var(--blue); color: var(--blue); }
+  .btn.blue:hover, .btn.blue:active { background: rgba(0,176,255,0.1); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn:disabled:active { transform: none; }
+
+  .btn-row { display: flex; gap: 8px; }
+  .btn-row .btn { flex: 1; }
+
+  /* ── device info ── */
+  #device-name {
+    font-size: 12px;
+    color: var(--green);
+    margin-bottom: 10px;
+    min-height: 16px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── module grid ── */
+  .module-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .module-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 10px 8px;
+    transition: border-color 0.3s;
+  }
+  .module-card.ok     { border-color: rgba(0,230,118,0.5); }
+  .module-card.diff   { border-color: rgba(255,179,0,0.5); }
+  .module-card.error  { border-color: rgba(255,23,68,0.3); }
+  .module-card.active { border-color: var(--blue); }
+
+  .module-name {
+    font-family: var(--head);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .module-card.ok    .module-name { color: var(--green); }
+  .module-card.diff  .module-name { color: var(--amber); }
+  .module-card.error .module-name { color: var(--red); }
+  .module-card.active .module-name { color: var(--blue); animation: pulse 0.8s infinite; }
+
+  .module-addr {
+    font-size: 10px;
+    color: var(--dim);
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+
+  .module-blob {
+    font-size: 9px;
+    color: var(--dim);
+    word-break: break-all;
+    line-height: 1.5;
+    min-height: 28px;
+  }
+  .module-card.ok   .module-blob { color: rgba(0,230,118,0.7); }
+  .module-card.diff .module-blob { color: rgba(255,179,0,0.7); }
+
+  .module-status {
+    font-family: var(--head);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-top: 5px;
+    text-transform: uppercase;
+  }
+  .module-card.ok    .module-status { color: var(--green); }
+  .module-card.diff  .module-status { color: var(--amber); }
+  .module-card.error .module-status { color: var(--red); }
+
+  /* ── result banner ── */
+  #result-banner {
+    display: none;
+    border-radius: 3px;
+    padding: 14px;
+    font-family: var(--head);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  #result-banner.scenario-a {
+    display: block;
+    background: rgba(0,230,118,0.1);
+    border: 1px solid var(--green);
+    color: var(--green);
+  }
+  #result-banner.scenario-b {
+    display: block;
+    background: rgba(255,179,0,0.1);
+    border: 1px solid var(--amber);
+    color: var(--amber);
+  }
+  #result-banner.scenario-c {
+    display: block;
+    background: rgba(0,176,255,0.1);
+    border: 1px solid var(--blue);
+    color: var(--blue);
+  }
+
+  /* ── constellation ── */
+  .const-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .const-label {
+    font-family: var(--head);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    text-transform: uppercase;
+    width: 60px;
+    flex-shrink: 0;
+  }
+  .const-val {
+    font-size: 11px;
+    color: var(--text);
+    letter-spacing: 1px;
+    word-break: break-all;
+  }
+  .const-val.changed { color: var(--green); }
+
+  /* ── cp status ── */
+  #cp-status-val {
+    font-family: var(--head);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-align: center;
+    padding: 16px;
+    text-transform: uppercase;
+  }
+  #cp-status-val.id-confirmed { color: var(--green); }
+  #cp-status-val.id-wrong     { color: var(--red); }
+  #cp-status-val.pending      { color: var(--dim); }
+  #cp-status-val.running      { color: var(--blue); animation: pulse 0.8s infinite; }
+
+  /* ── log ── */
+  #log {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    font-size: 11px;
+    color: var(--dim);
+    height: 120px;
+    overflow-y: auto;
+    line-height: 1.6;
+  }
+  #log .ok  { color: var(--green); }
+  #log .err { color: var(--red); }
+  #log .hdr { color: var(--blue); }
+  #log .warn{ color: var(--amber); }
+
+  /* ── tabs ── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab {
+    font-family: var(--head);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    cursor: pointer;
+    color: var(--dim);
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── separator ── */
+  .sep {
+    height: 1px;
+    background: var(--border);
+    margin: 10px 0;
+  }
+
+  /* ── export ── */
+  #export-area {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    font-size: 10px;
+    color: var(--dim);
+    width: 100%;
+    height: 80px;
+    resize: none;
+    font-family: var(--mono);
+  }
+
+  /* ── spinner ── */
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">VAG<span>-</span>CP</div>
+  <div id="conn-pill" class="disconnected">OFFLINE</div>
+</header>
+
+<main>
+
+  <!-- ── CONNECT CARD ── -->
+  <div class="card">
+    <div class="card-head" id="conn-head">
+      <span class="dot"></span>
+      ESP32 BLE BRIDGE
+    </div>
+    <div class="card-body">
+      <div id="device-name">no device connected</div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-scan" onclick="handleScan()">
+          ⟳ SCAN &amp; CONNECT
+        </button>
+        <button class="btn danger" id="btn-disconnect" onclick="handleDisconnect()" disabled>
+          ✕ DISCONNECT
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TABS ── -->
+  <div class="card" style="flex:1">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('ika')">🔑 IKA KEYS</div>
+      <div class="tab" onclick="switchTab('const')">⊞ CONST</div>
+      <div class="tab" onclick="switchTab('cp')">⚙ CP CHECK</div>
+      <div class="tab" onclick="switchTab('log')">◈ LOG</div>
+    </div>
+
+    <!-- IKA KEY TAB -->
+    <div class="tab-panel active" id="panel-ika">
+      <div style="padding:12px 14px">
+        <button class="btn primary" id="btn-ika" onclick="runIKARead()" disabled>
+          🔑 READ ALL IKA KEYS (DID 0x00BE)
+        </button>
+
+        <div class="sep"></div>
+
+        <div id="result-banner"></div>
+
+        <div class="module-grid" id="module-grid">
+          <!-- populated by JS -->
+        </div>
+
+        <div class="sep" id="export-sep" style="display:none"></div>
+        <textarea id="export-area" style="display:none" readonly></textarea>
+        <button class="btn" id="btn-copy" style="display:none;margin-top:8px" onclick="copyResults()">
+          ⎘ COPY RESULTS
+        </button>
+      </div>
+    </div>
+
+    <!-- CONSTELLATION TAB -->
+    <div class="tab-panel" id="panel-const">
+      <div style="padding:12px 14px">
+        <button class="btn blue" id="btn-const" onclick="readConstellation()" disabled>
+          ⊞ READ CONSTELLATION (DID 0x04A3)
+        </button>
+        <div class="sep"></div>
+        <div id="const-display">
+          <div class="const-row">
+            <div class="const-label">RAW</div>
+            <div class="const-val" id="const-raw">—</div>
+          </div>
+          <div class="const-row">
+            <div class="const-label">HEX</div>
+            <div class="const-val" id="const-hex">—</div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--dim);line-height:1.7">
+            <div>Known before (Feb 2024):</div>
+            <div style="color:var(--amber);letter-spacing:1px">FD A1 E9 0C FE 62 64 8D 00 00</div>
+            <div style="margin-top:4px">Known after (Feb 2024):</div>
+            <div style="color:var(--green);letter-spacing:1px">FD A1 E8 0C FE 62 60 0D 00 00</div>
+          </div>
+        </div>
+
+        <div class="sep"></div>
+        <button class="btn blue" id="btn-gka" onclick="readDID('J533', 0x710, 0x77A, 0x00BD, 'gka-result')" disabled>
+          READ GKA KEY (DID 0x00BD)
+        </button>
+        <div id="gka-result" style="margin-top:8px;font-size:11px;color:var(--dim);word-break:break-all;line-height:1.6"></div>
+      </div>
+    </div>
+
+    <!-- CP STATUS TAB -->
+    <div class="tab-panel" id="panel-cp">
+      <div style="padding:12px 14px">
+        <div id="cp-status-val" class="pending">ROUTINE 0x0226</div>
+        <div style="font-size:10px;color:var(--dim);text-align:center;margin-bottom:12px;letter-spacing:1px">
+          Send 31 01 02 26 to J533 — awaiting response
+        </div>
+        <button class="btn amber" id="btn-cp" onclick="runCPCheck()" disabled>
+          ⟳ CHECK CP ROUTINE ID
+        </button>
+        <div class="sep"></div>
+        <div style="font-size:11px;color:var(--dim);line-height:1.9">
+          <div><span style="color:var(--green)">7F 31 22</span> → ID confirmed, token required</div>
+          <div><span style="color:var(--red)">7F 31 31</span>   → Wrong routine ID</div>
+          <div><span style="color:var(--amber)">7F 31 7E</span>  → Wrong session</div>
+          <div><span style="color:var(--blue)">71 01 02 26</span> → Routine accepted</div>
+        </div>
+        <div class="sep"></div>
+        <div id="cp-raw" style="font-size:11px;color:var(--dim);min-height:20px;letter-spacing:1px"></div>
+      </div>
+    </div>
+
+    <!-- LOG TAB -->
+    <div class="tab-panel" id="panel-log">
+      <div style="padding:12px 14px">
+        <div id="log"></div>
+        <div style="margin-top:8px">
+          <button class="btn" onclick="clearLog()">✕ CLEAR LOG</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+const SERVICE_UUID  = '0000abf0-0000-1000-8000-00805f9b34fb';
+const CHAR_WRITE    = '0000abf1-0000-1000-8000-00805f9b34fb'; // tester → ESP32
+const CHAR_NOTIFY   = '0000abf2-0000-1000-8000-00805f9b34fb'; // ESP32 → tester
+
+const BLE_HEADER_ID = 0xF1;
+const BLE_HEADER_SZ = 8;
+
+// Module definitions: name, TX, RX
+const MODULES = [
+  { name: 'J533',  desc: 'Gateway',     tx: 0x710, rx: 0x77A },
+  { name: 'J255',  desc: 'Climatronic', tx: 0x746, rx: 0x7AE },
+  { name: 'J285',  desc: 'Instruments', tx: 0x720, rx: 0x728 },
+  { name: 'J234',  desc: 'Airbag',      tx: 0x736, rx: 0x73E },
+  { name: 'J794',  desc: 'MMI',         tx: 0x7C0, rx: 0x7C8 },
+  { name: 'J136',  desc: 'Mem. Seat',   tx: 0x714, rx: 0x77C },
+];
+
+// Known IKA blob from Feb 2024 ODIS session
+const KNOWN_BLOB = 'e62b41d11c44af202177fb1f274b0ac2d15bd262e4fd27ab61d123c2f15a2c932600';
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BLE STATE
+// ══════════════════════════════════════════════════════════════════════════════
+
+let device = null;
+let server = null;
+let writeChar = null;
+let notifyChar = null;
+let rxQueue = [];    // pending response bytes
+let rxResolvers = []; // pending waiters
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const panels = ['ika','const','cp','log'];
+    t.classList.toggle('active', panels[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'panel-'+name);
+  });
+}
+
+function log(msg, cls='') {
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = '> ' + msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('log').innerHTML = '';
+}
+
+function setConnected(name) {
+  document.getElementById('conn-pill').className = 'connected';
+  document.getElementById('conn-pill').textContent = 'ONLINE';
+  document.getElementById('conn-head').className = 'card-head active';
+  document.getElementById('device-name').textContent = name || 'BLE_TO_ISOTP20';
+  document.getElementById('btn-scan').disabled = true;
+  document.getElementById('btn-disconnect').disabled = false;
+  ['btn-ika','btn-const','btn-cp','btn-gka'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
+}
+
+function setDisconnected() {
+  document.getElementById('conn-pill').className = 'disconnected';
+  document.getElementById('conn-pill').textContent = 'OFFLINE';
+  document.getElementById('conn-head').className = 'card-head';
+  document.getElementById('device-name').textContent = 'no device connected';
+  document.getElementById('btn-scan').disabled = false;
+  document.getElementById('btn-disconnect').disabled = true;
+  ['btn-ika','btn-const','btn-cp','btn-gka'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = true;
+  });
+}
+
+function setConnecting() {
+  document.getElementById('conn-pill').className = 'connecting';
+  document.getElementById('conn-pill').textContent = 'LINKING…';
+  document.getElementById('btn-scan').disabled = true;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BLE PROTOCOL
+// ══════════════════════════════════════════════════════════════════════════════
+
+function buildHeader(txId, rxId, payloadLen) {
+  const buf = new ArrayBuffer(BLE_HEADER_SZ);
+  const view = new DataView(buf);
+  view.setUint8(0, BLE_HEADER_ID);  // hdID
+  view.setUint8(1, 0x00);           // cmdFlags
+  view.setUint16(2, rxId, true);    // rxID LE
+  view.setUint16(4, txId, true);    // txID LE
+  view.setUint16(6, payloadLen, true); // cmdSize LE
+  return buf;
+}
+
+function sendUDS(txId, rxId, udsBytes) {
+  const header = buildHeader(txId, rxId, udsBytes.length);
+  const packet = new Uint8Array(BLE_HEADER_SZ + udsBytes.length);
+  packet.set(new Uint8Array(header), 0);
+  packet.set(udsBytes, BLE_HEADER_SZ);
+  return writeChar.writeValueWithoutResponse(packet);
+}
+
+function onNotify(event) {
+  const raw = new Uint8Array(event.target.value.buffer);
+  // Parse one or more framed messages
+  let offset = 0;
+  while (offset < raw.length) {
+    const hdId = raw[offset];
+    if (hdId === BLE_HEADER_ID) {
+      if (offset + BLE_HEADER_SZ > raw.length) break;
+      const view   = new DataView(raw.buffer, offset);
+      const flags  = view.getUint8(1);
+      const rxId   = view.getUint16(2, true);
+      const txId   = view.getUint16(4, true);
+      const size   = view.getUint16(6, true);
+      offset += BLE_HEADER_SZ;
+      if (offset + size > raw.length) break;
+      const payload = raw.slice(offset, offset + size);
+      offset += size;
+      // Deliver to all waiting resolvers
+      if (rxResolvers.length > 0) {
+        const resolve = rxResolvers.shift();
+        resolve({ txId, rxId, payload });
+      } else {
+        rxQueue.push({ txId, rxId, payload });
+      }
+    } else {
+      offset++; // skip unknown
+    }
+  }
+}
+
+function waitResponse(timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    if (rxQueue.length > 0) {
+      resolve(rxQueue.shift());
+      return;
+    }
+    const timer = setTimeout(() => {
+      const idx = rxResolvers.indexOf(resolve);
+      if (idx >= 0) rxResolvers.splice(idx, 1);
+      reject(new Error('timeout'));
+    }, timeoutMs);
+    rxResolvers.push((val) => {
+      clearTimeout(timer);
+      resolve(val);
+    });
+  });
+}
+
+async function udsRequest(txId, rxId, reqBytes, timeoutMs = 5000) {
+  rxQueue = []; // flush stale
+  await sendUDS(txId, rxId, reqBytes);
+  const resp = await waitResponse(timeoutMs);
+  return resp.payload;
+}
+
+// UDS: change to extended session
+async function extendedSession(txId, rxId) {
+  const resp = await udsRequest(txId, rxId, new Uint8Array([0x10, 0x03]));
+  if (resp[0] !== 0x50) throw new Error(`Session failed: ${fmtHex(resp)}`);
+}
+
+// UDS: ReadDataByIdentifier
+async function readDIDRaw(txId, rxId, did) {
+  const didHi = (did >> 8) & 0xFF;
+  const didLo = did & 0xFF;
+  const resp = await udsRequest(txId, rxId, new Uint8Array([0x22, didHi, didLo]));
+  if (resp[0] === 0x7F) throw new Error(`NRC 0x${resp[2].toString(16).toUpperCase().padStart(2,'0')}`);
+  if (resp[0] !== 0x62) throw new Error(`Unexpected: ${fmtHex(resp)}`);
+  return resp.slice(3); // skip 62 DI DI
+}
+
+function fmtHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+}
+
+function fmtHexCompact(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('').toLowerCase();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONNECT / DISCONNECT
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function handleScan() {
+  if (!navigator.bluetooth) {
+    log('Web Bluetooth not supported. Use Chrome on Android.', 'err');
+    alert('Web Bluetooth is not available.\n\nMake sure you are using Chrome on Android (not Firefox or Samsung Internet).\n\nIf using Chrome, go to chrome://flags and enable "Web Bluetooth".');
+    return;
+  }
+  try {
+    setConnecting();
+    log('Scanning for BLE_TO_ISOTP20 (service 0xABF0)…', 'hdr');
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SERVICE_UUID] }],
+      optionalServices: [SERVICE_UUID]
+    });
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    log(`Found: ${device.name || 'unnamed'}`, 'ok');
+
+    log('Connecting GATT…');
+    server = await device.gatt.connect();
+
+    const svc = await server.getPrimaryService(SERVICE_UUID);
+    writeChar  = await svc.getCharacteristic(CHAR_WRITE);
+    notifyChar = await svc.getCharacteristic(CHAR_NOTIFY);
+    await notifyChar.startNotifications();
+    notifyChar.addEventListener('characteristicvaluechanged', onNotify);
+
+    log(`Connected: ${device.name}`, 'ok');
+    setConnected(device.name);
+  } catch(e) {
+    log(`Connect failed: ${e.message}`, 'err');
+    setDisconnected();
+  }
+}
+
+function onDisconnected() {
+  log('BLE disconnected', 'warn');
+  setDisconnected();
+  device = null; server = null; writeChar = null; notifyChar = null;
+}
+
+async function handleDisconnect() {
+  if (device && device.gatt.connected) {
+    device.gatt.disconnect();
+  }
+  setDisconnected();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BUILD MODULE GRID
+// ══════════════════════════════════════════════════════════════════════════════
+
+function buildModuleGrid() {
+  const grid = document.getElementById('module-grid');
+  grid.innerHTML = '';
+  MODULES.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'module-card';
+    card.id = `mod-${m.name}`;
+    card.innerHTML = `
+      <div class="module-name">${m.name}</div>
+      <div class="module-addr">${m.desc} · TX ${m.tx.toString(16).toUpperCase()}</div>
+      <div class="module-blob" id="blob-${m.name}">—</div>
+      <div class="module-status" id="status-${m.name}"></div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IKA KEY READ
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function runIKARead() {
+  const btn = document.getElementById('btn-ika');
+  btn.disabled = true;
+  btn.textContent = '⟳ READING…';
+
+  buildModuleGrid();
+  document.getElementById('result-banner').className = '';
+  document.getElementById('result-banner').style.display = 'none';
+  document.getElementById('export-sep').style.display = 'none';
+  document.getElementById('export-area').style.display = 'none';
+  document.getElementById('btn-copy').style.display = 'none';
+
+  switchTab('ika');
+  log('── IKA Key Read ──', 'hdr');
+
+  const results = {};
+
+  for (const mod of MODULES) {
+    const card = document.getElementById(`mod-${mod.name}`);
+    card.className = 'module-card active';
+    document.getElementById(`status-${mod.name}`).textContent = 'reading…';
+    log(`${mod.name} TX:${mod.tx.toString(16)} RX:${mod.rx.toString(16)}`);
+
+    try {
+      // Open extended session
+      await extendedSession(mod.tx, mod.rx);
+      // Read DID 0x00BE
+      const data = await readDIDRaw(mod.tx, mod.rx, 0x00BE);
+      const hex = fmtHexCompact(data);
+
+      results[mod.name] = hex;
+      document.getElementById(`blob-${mod.name}`).textContent = fmtHex(data);
+
+      const matchesKnown = (hex === KNOWN_BLOB);
+      card.className = 'module-card ok';
+      document.getElementById(`status-${mod.name}`).textContent =
+        matchesKnown ? '✓ MATCHES KNOWN' : '• DIFFERENT';
+      if (!matchesKnown) card.className = 'module-card diff';
+
+      log(`${mod.name}: ${hex.substring(0,16)}…`, 'ok');
+    } catch(e) {
+      results[mod.name] = null;
+      card.className = 'module-card error';
+      document.getElementById(`blob-${mod.name}`).textContent = e.message;
+      document.getElementById(`status-${mod.name}`).textContent = 'ERROR';
+      log(`${mod.name}: ${e.message}`, 'err');
+    }
+
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  // ── Analyse results ──
+  const blobs = Object.values(results).filter(v => v !== null);
+  const unique = new Set(blobs);
+
+  const banner = document.getElementById('result-banner');
+  if (unique.size === 1) {
+    banner.className = 'scenario-a';
+    banner.textContent = '✓ SCENARIO A — ALL IDENTICAL · VIN-BOUND KEY';
+    log('ALL MODULES: IDENTICAL IKA KEY → VIN-bound derivation confirmed', 'ok');
+    log('Write E62B41D1… to J255 DID 0x00BE to clear CP', 'ok');
+  } else if (unique.size === 2) {
+    banner.className = 'scenario-b';
+    banner.textContent = '⚠ SCENARIO B — 2 VARIANTS FOUND · PATTERN ANALYSIS NEEDED';
+    log(`${unique.size} distinct blobs found → per-module-type derivation`, 'warn');
+  } else {
+    banner.className = 'scenario-c';
+    banner.textContent = `◈ SCENARIO C — ${unique.size} VARIANTS · PER-SERIAL DERIVATION`;
+    log(`${unique.size} distinct blobs → per-serial derivation`, 'warn');
+  }
+
+  // Export
+  let exportTxt = `VAG-CP IKA Key Read — ${new Date().toISOString()}\n`;
+  exportTxt += `Known blob: ${KNOWN_BLOB}\n\n`;
+  for (const [name, blob] of Object.entries(results)) {
+    exportTxt += `${name}: ${blob || 'ERROR'}\n`;
+  }
+  exportTxt += `\nResult: ${banner.textContent}`;
+
+  document.getElementById('export-area').value = exportTxt;
+  document.getElementById('export-sep').style.display = '';
+  document.getElementById('export-area').style.display = '';
+  document.getElementById('btn-copy').style.display = '';
+
+  btn.disabled = false;
+  btn.textContent = '🔑 READ ALL IKA KEYS (DID 0x00BE)';
+}
+
+function copyResults() {
+  const area = document.getElementById('export-area');
+  area.select();
+  navigator.clipboard.writeText(area.value).then(() => {
+    const btn = document.getElementById('btn-copy');
+    const orig = btn.textContent;
+    btn.textContent = '✓ COPIED';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONSTELLATION READ
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function readConstellation() {
+  const btn = document.getElementById('btn-const');
+  btn.disabled = true;
+  btn.textContent = '⟳ READING…';
+  log('Reading J533 constellation DID 0x04A3…', 'hdr');
+
+  try {
+    await extendedSession(0x710, 0x77A);
+    const data = await readDIDRaw(0x710, 0x77A, 0x04A3);
+    const hex = fmtHex(data);
+    const compact = fmtHexCompact(data);
+
+    document.getElementById('const-raw').textContent = compact;
+    document.getElementById('const-hex').textContent = hex;
+
+    // Compare against known values
+    const knownAfter = 'fda1e80cfe62600d0000';
+    const knownBefore = 'fda1e90cfe626448d0000';
+    if (compact === knownAfter) {
+      document.getElementById('const-hex').className = 'const-val changed';
+      log('Constellation matches post-Feb2024 state ✓', 'ok');
+    } else {
+      log(`Constellation: ${hex}`, 'ok');
+    }
+  } catch(e) {
+    log(`Constellation read failed: ${e.message}`, 'err');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '⊞ READ CONSTELLATION (DID 0x04A3)';
+}
+
+// Generic DID read
+async function readDID(modName, txId, rxId, did, resultElId) {
+  log(`Reading ${modName} DID 0x${did.toString(16).toUpperCase()}…`, 'hdr');
+  try {
+    await extendedSession(txId, rxId);
+    const data = await readDIDRaw(txId, rxId, did);
+    const hex = fmtHex(data);
+    const el = document.getElementById(resultElId);
+    if (el) { el.style.color = 'var(--green)'; el.textContent = hex; }
+    log(`${modName} 0x${did.toString(16).toUpperCase()}: ${hex}`, 'ok');
+  } catch(e) {
+    const el = document.getElementById(resultElId);
+    if (el) { el.style.color = 'var(--red)'; el.textContent = e.message; }
+    log(`${modName}: ${e.message}`, 'err');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CP STATUS CHECK
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function runCPCheck() {
+  const btn = document.getElementById('btn-cp');
+  const statusEl = document.getElementById('cp-status-val');
+  const rawEl = document.getElementById('cp-raw');
+
+  btn.disabled = true;
+  statusEl.className = 'running';
+  statusEl.textContent = 'SENDING 31 01 02 26…';
+  rawEl.textContent = '';
+  log('CP routine check: 31 01 02 26 to J533…', 'hdr');
+
+  try {
+    await extendedSession(0x710, 0x77A);
+    // Send RoutineControl Start 0x0226
+    const resp = await udsRequest(0x710, 0x77A, new Uint8Array([0x31, 0x01, 0x02, 0x26]));
+    const hex = fmtHex(resp);
+    rawEl.textContent = 'Response: ' + hex;
+    log(`CP response: ${hex}`, resp[0]===0x7F ? 'warn' : 'ok');
+
+    if (resp[0] === 0x7F && resp[1] === 0x31 && resp[2] === 0x22) {
+      statusEl.className = 'id-confirmed';
+      statusEl.textContent = '✓ ID CONFIRMED';
+      log('Routine ID 0x0226 confirmed — conditionsNotCorrect (token required)', 'ok');
+    } else if (resp[0] === 0x7F && resp[2] === 0x31) {
+      statusEl.className = 'id-wrong';
+      statusEl.textContent = '✗ WRONG ROUTINE ID';
+      log('requestOutOfRange — routine ID incorrect', 'err');
+    } else if (resp[0] === 0x71) {
+      statusEl.className = 'id-confirmed';
+      statusEl.textContent = '✓ ROUTINE ACCEPTED';
+      log('Routine accepted — positive response', 'ok');
+    } else {
+      statusEl.className = 'pending';
+      statusEl.textContent = hex;
+    }
+  } catch(e) {
+    statusEl.className = 'id-wrong';
+    statusEl.textContent = 'ERROR';
+    rawEl.textContent = e.message;
+    log(`CP check error: ${e.message}`, 'err');
+  }
+
+  btn.disabled = false;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════════════════════
+
+buildModuleGrid();
+log('VAG-CP Tool ready', 'ok');
+log('Chrome on Android · Web Bluetooth required');
+
+if (!navigator.bluetooth) {
+  log('Web Bluetooth not detected — use Chrome', 'err');
+}
+</script>
+
+</body>
+</html>
