@@ -1,6 +1,6 @@
-# ODIS CP Session — WAUGGAFC7DN120188 — Feb 27, 2024
+# ODIS CP Session — WAUGGA**********8 — Feb 27, 2024
 
-**Source:** `NO_ORDER_WAUGGAFC7DN120188_2024-02-27_22-59-28_dprot.htm`  
+**Source:** `NO_ORDER_WAUGGA**********8_2024-02-27_22-59-28_dprot.htm`  
 **Session:** February 27, 2024, 22:59 UTC  
 **Tool:** ODIS-S Patch 23.0.1, VAS 6154A, VCI via USB  
 **ODIS user:** Dealer 17483, importer 219 (authorized dealer)  
@@ -11,7 +11,7 @@
 ## What happened in this session
 
 This is a complete Component Protection removal session performed on VIN
-`WAUGGAFC7DN120188` (2013 Audi A6 C7, 3.0T TFSI CGWB, built Neckarsulm).
+`WAUGGA**********8` (2013 Audi A6 C7, 3.0T TFSI CGWB, built Neckarsulm).
 
 **12 modules were successfully CP-cleared:**
 
@@ -72,7 +72,7 @@ read the following from J518 before contacting GEKO:
 
 | DID | Value |
 |-----|-------|
-| F190 VIN | `WAUGGAFC7DN120188` |
+| F190 VIN | `WAUGGA**********8` |
 | F17C FAZIT (J518) | `HLH-W41 / 21.02.13 / 1003 / 1126` |
 | F191 HW number | `4H0907064CR` |
 
@@ -104,7 +104,7 @@ internally via the `TrainICA` / `TrainGVA` KWP calls (masked with `******`).
 ## What inputs drive the IKA key
 
 From this log we can confirm GEKO received:
-- **VIN:** `WAUGGAFC7DN120188`
+- **VIN:** `WAUGGA**********8`
 - **J518 FAZIT:** `HLH-W4121.02.1310031126` (part number + date + codes)
 - **J518 HW:** `4H0907064CR`
 - **J533 FAZIT:** `LAK-00022.02.1320097162`
