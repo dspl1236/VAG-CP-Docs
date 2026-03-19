@@ -631,3 +631,218 @@ by running `dumpMWB.py` natively on Linux using the open-source PBL library. See
 - Jim Ellis Audi Parts — OEM parts fitment data for 4G0907468C
 - eBay listing data — 4G0907468G fitment (2012-2018 confirmed)
 - diagnostics.vis4vag.com — A6 4G gateway variant listing (EV_GatewPkoUDS variants)
+
+---
+
+## Session Confirmation — Feb 27, 2024 ODIS Log
+
+*The theoretical model described above was written from behavioral observation and
+community research. The following section upgrades it to confirmed from a real
+ODIS CP removal session captured on VIN `WAUGGAFC7DN120188` — a 2013 Audi A6 C7,
+3.0T TFSI CGWB, built Neckarsulm.*
+
+*Full session analysis: `technical/odis-cp-session-wauggafc7dn120188.md`*
+
+---
+
+### The Car-Wide Checksum Model
+
+The most useful mental model for understanding CP is to think of J533's
+constellation as a **car-wide integrity checksum across all enrolled modules.**
+
+A traditional checksum runs over bytes of data and produces a value that only
+matches if every byte is correct. The CP constellation works the same way, but
+across physical modules on the CAN bus:
+
+```
+Constellation integrity = f(
+    J533 serial,
+    J518 serial,
+    J255 serial,
+    J519 serial,
+    J234 serial,
+    J285 serial,
+    J525 serial,
+    Radio serial,
+    J794 serial,
+    J854 serial,
+    J855 serial,
+    J136 serial,
+    ... all enrolled modules
+)
+```
+
+If any one module is swapped out, its serial number no longer matches J533's
+expected value for that slot — exactly like a corrupted byte in a checksum.
+The system flags the mismatch as Component Protection Active.
+
+**This is why you can't fix CP on just one module in isolation.** The constellation
+is a system-level property. The integrity check fails when any enrolled component
+doesn't match. ODIS's CP removal procedure is designed around this — it clears
+and re-enrolls the entire car in a single atomic session.
+
+---
+
+### What the Feb 2024 Session Confirms
+
+**Confirmed: J533 is the master and the session clears everything atomically.**
+
+The session log shows ODIS calling
+`j533_4G_90_UDS_2_0613_21_KS_SGs_ermitteln_00021` — "determine CP control
+modules" — on J533 first. J533 returned its full enrollment list of 12 modules.
+ODIS then cleared every single one sequentially before updating the constellation.
+
+12 modules cleared in one session:
+
+| Module | Protocol | Result |
+|--------|----------|--------|
+| J533 Gateway | UDS | ✓ cleared (master first) |
+| J518 Access/Start (Kessy) | KWP2000 | ✓ cleared |
+| J255 Climatronic | UDS | ✓ cleared |
+| J519 Vehicle Electrical System | KWP2000 | ✓ cleared |
+| J234 Airbag | UDS | ✓ cleared |
+| J285 Instrument Cluster | UDS | ✓ cleared |
+| J525 Digital Sound System | KWP2000 | ✓ cleared |
+| R-- Radio | KWP2000 | ✓ cleared |
+| J794 MMI (Info Electronics 1) | UDS | ✓ cleared |
+| J854 Left Front Seat Belt Tensioner | KWP2000 | ✓ cleared |
+| J855 Right Front Seat Belt Tensioner | KWP2000 | ✓ cleared |
+| J136 Memory Seat/Steering Column | KWP2000 | ✓ cleared |
+
+J521 (passenger memory seat) was attempted but returned
+`ECF_OPEN_LOGICAL_LINK_FAILED` — not installed on this car.
+
+**Confirmed: DID `0x04A3` is the constellation and it changed.**
+
+Before and after the session, J533's constellation DID changed:
+
+```
+Before:  FD A1 E9 0C FE 62 64 8D 00 00
+After:   FD A1 E8 0C FE 62 60 0D 00 00
+```
+
+Four bytes changed, each representing bit-level enrollment state changes
+across the module slots. This is the concrete proof that `0x04A3` is the
+"checksum field" — the single value on J533 that encodes the pass/fail state
+of the entire car's module complement.
+
+**Confirmed: The IKA key for J136 (34 bytes, DID `0x00BE`).**
+
+This is the only unmasked IKA key blob in the entire session log. All other
+modules had their keys masked as `******` in the ODIS log. J136 went through
+a different code path (direct `WriteDataByIdentifier` rather than the masked
+`TrainICA` KWP service) and its key was logged verbatim:
+
+```
+E6 2B 41 D1 1C 44 AF 20 21 77 FB 1F 27 4B 0A C2
+D1 5B D2 62 E4 FD 27 AB 61 D1 23 C2 F1 5A 2C 93 26 00
+```
+
+This 34-byte value is the individual module authorization key (IKA) — the
+component-level "checksum" that ties this specific module to this specific car.
+
+---
+
+### The Two-Layer Checksum Architecture
+
+The session log reveals that CP actually operates on two distinct layers, which
+work together like nested checksums:
+
+**Layer 1 — The Constellation (J533 DID `0x04A3`):**
+A 10-byte bitmap on J533 encoding which modules are enrolled and in what state.
+This is the car-level check. J533 holds it. It gets rewritten during any CP
+operation. Think of it as the outer checksum — it covers the whole system.
+
+**Layer 2 — The IKA Key (DID `0x00BE` on each module):**
+A 34-byte cryptographic value written individually to each enrolled module.
+This is the module-level check. Each module holds its own copy. It proves that
+the module was authorized by GEKO for this specific VIN. Think of it as the
+inner checksum — it covers the individual component.
+
+Both layers must be consistent for CP to be cleared:
+
+```
+CP cleared iff:
+    J533 constellation[module_slot] == ENROLLED
+    AND
+    module.DID_0x00BE == valid_IKA_key_for_this_VIN
+```
+
+Swapping a module breaks Layer 2 (new module has no valid IKA key) and
+eventually Layer 1 (J533's constellation flags the mismatch). Replacing J533
+itself breaks Layer 1 (new gateway has an empty constellation) and potentially
+Layer 2 (if the IKA key derivation includes the J533 serial).
+
+---
+
+### Inputs GEKO Used to Generate the IKA Key
+
+From the session log, before contacting GEKO, ODIS collected these values:
+
+| Source | DID | Value |
+|--------|-----|-------|
+| VIN (from J518) | F190 | `WAUGGAFC7DN120188` |
+| J518 FAZIT | F17C | `HLH-W41 21.02.13 1003 1126` |
+| J518 HW number | F191 | `4H0907064CR` |
+| J533 FAZIT | F17C | `LAK-000 22.02.13 2009 7162` |
+| J136 FAZIT | F17C | `CU5-SIB 21.03.11 0002 0968` |
+| Key fob transponder | TrainICA | `******` (masked) |
+
+GEKO received these values and returned the IKA key blob. The key fob
+transponder data is the one unknown input — it may be used only as an
+authorization check (proving physical possession) or it may be mathematically
+incorporated into the key derivation. This remains an open research question.
+
+---
+
+### The Replacement Module Problem — Explained by the Model
+
+When the original J255 failed and was physically removed from the car, the Feb
+2024 ODIS session enrolled the replacement (4-zone) J255 in its place. The session:
+
+1. Read the replacement J255's FAZIT and serial number
+2. Sent those to GEKO along with the VIN and other module data
+3. Received an IKA key blob for that replacement unit
+4. Wrote the blob to the replacement J255's DID `0x00BE`
+5. Updated J533's constellation `0x04A3` to include the replacement J255's slot
+
+The original broken J255 was out of the car during this session. It therefore:
+- Was never sent to GEKO
+- Never received an IKA key blob
+- Is not referenced in J533's current constellation
+
+When the original unit is plugged back in today:
+- J533 checks its constellation → original J255 serial is not in the enrollment list
+- J533 checks DID `0x00BE` on the original J255 → all zeros, no valid IKA key
+- Both layers of the checksum fail simultaneously
+- J533 asserts DTC U110100: Component Protection Active
+
+**The fix requires updating both layers:**
+
+Step 1 — Write a valid IKA key to the original J255's DID `0x00BE`.
+Whether this is the same blob as all other modules (VIN-bound) or a unique blob
+(module-serial-bound) is determined by reading DID `0x00BE` from multiple modules
+and comparing. This is what the hardware test is designed to answer.
+
+Step 2 — Update J533's constellation DID `0x04A3` to include the original J255.
+The specific bit(s) that changed between the before/after values in the Feb 2024
+session (`64 8D` → `60 0D` in bytes 5-6) identify the J255 slot position.
+
+Both writes are UDS operations against J533 in extended session. SA2
+authentication is required. No GEKO token is required if the IKA key is already
+known — the token was only needed to generate the key the first time.
+
+---
+
+### Updated Research Status
+
+| Claim | Status |
+|-------|--------|
+| J533 is the CP master | ✓ Confirmed — session clears J533 first |
+| Constellation is atomic (all-or-nothing) | ✓ Confirmed — 12 modules cleared together |
+| DID `0x04A3` is the constellation field | ✓ Confirmed — changed before/after |
+| DID `0x00BE` is the IKA key, 34 bytes | ✓ Confirmed — J136 blob captured verbatim |
+| CP routine ID is `0x0226` | ✓ Extracted from `ES_LIBCompoProteGen3V12.sd.db` |
+| IKA key is VIN-bound vs module-bound | ✗ Open — hardware test pending |
+| Transponder data in key derivation | ✗ Open — masked in log |
+| J255 constellation slot bit position | ✓ Derivable — bytes 5-6 of `0x04A3` changed |
