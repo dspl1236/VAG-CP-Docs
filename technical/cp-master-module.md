@@ -42,7 +42,7 @@ The J533 Data Bus Diagnostic Interface (gateway) sits at the center of every CAN
 On every ignition cycle, J533 performs what VW calls a "constellation check":
 
 1. J533 broadcasts an interrogation to all CP-protected modules on the CAN bus
-2. Each protected module responds with its cryptographic identity (derived from its EEPROM, encoded at factory against the vehicle's VIN/FAZIT database record)
+2. Each protected module responds with its cryptographic identity (derived from its EEPROM on older Temic-platform modules, or internal MCU flash on newer Lear-platform modules — see `community-research-eeprom.md` for the platform distinction, encoded at factory against the vehicle's VIN/FAZIT database record)
 3. J533 compares responses against its stored "expected constellation"
 4. Any module returning an unexpected value (because it was swapped, or J533 itself was replaced) triggers CP activation on that module
 5. J533 sends the restriction command back to the non-matching module
