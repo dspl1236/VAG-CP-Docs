@@ -8,7 +8,7 @@
 
 ### The Short Answer: No — but the architecture changed over time
 
-CP removal has **always required an online GEKO server connection** within ODIS. There was never a version of ODIS that performed CP removal entirely offline. This is by design — the server dependency was built into the CP system from its introduction in 2002-2003.
+CP removal has **always required an online server connection** — first GEKO, now GRP. The key distinction with GRP: it is fully operational for dealers, but Immobilizer/CP access has been deliberately withheld from third-party tools. There was never a version of ODIS that performed CP removal entirely offline. This is by design — the server dependency was built into the CP system from its introduction in 2002-2003.
 
 However, the architecture of *which* server and *what* ODIS version has changed significantly:
 
