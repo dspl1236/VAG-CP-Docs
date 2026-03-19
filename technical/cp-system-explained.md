@@ -1,6 +1,6 @@
 # Component Protection — How the System Actually Works
 
-*Written to accompany the Feb 27, 2024 ODIS session log for VIN WAUGGAFC7DN120188.*
+*Written to accompany the Feb 27, 2024 ODIS session log for VIN WAUGGA**********8.*
 
 ---
 
@@ -185,5 +185,5 @@ If all blobs are identical, the fix is fully determined and offline.
 
 ---
 
-*Source: ODIS session log `NO_ORDER_WAUGGAFC7DN120188_2024-02-27_22-59-28_dprot.htm`,
+*Source: ODIS session log `NO_ORDER_WAUGGA**********8_2024-02-27_22-59-28_dprot.htm`,
 Renesas SH7254R datasheet, VAG-CP-Docs research.*
