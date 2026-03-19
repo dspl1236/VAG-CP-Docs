@@ -151,7 +151,7 @@ The concept: physically remove the 95320 EEPROM from your working original J255,
 Since you have ODIS-S (engineering version), here is what it exposes beyond ODIS-E relevant to CP:
 
 ### Security Access Levels
-ODIS-S exposes extended security access levels for adaptation channels. Standard ODIS-E requires the GEKO server to unlock security access for CP-relevant channels. ODIS-S in some configurations can:
+ODIS-S exposes extended security access levels for adaptation channels. Standard ODIS-E requires the GEKO server to unlock security access for CP-relevant channels. Note: GEKO's Immobilizer/CP endpoint has been offline since at least early 2026 with no ETA, making the online path currently unavailable. ODIS-S in some configurations can:
 - Access lower security levels (Level 1/2) without online authentication
 - View (but not write) CP-related adaptation channels
 - Show the raw channel values that contain CP state data
@@ -207,6 +207,103 @@ The community research documented here establishes several important facts:
 4. **Third-party server replication is proven possible.** ABRITES' online CP service proves the server-side protocol is known and implementable. VW's server dependency is a business choice, not a technical necessity.
 
 ---
+
+
+---
+
+## C7 Platform Analysis — Why the EEPROM Swap Partially Works (and When It Fails)
+
+*This section applies the two-layer CP model confirmed from the Feb 2024 ODIS session
+on VIN WAUGGAFC7DN120188. See `j533-constellation-deep-dive.md` for the full model.*
+
+The EEPROM swap approach is often described as a simple fix. The reality depends
+on which module, which gateway generation, and which layer of CP you're targeting.
+
+### The Two-Layer Model
+
+CP enforcement operates on two distinct layers simultaneously:
+
+**Layer 1 — The Constellation (J533 DID `0x04A3`, 10 bytes):**
+A bitmap on J533 encoding which modules are enrolled. J533 holds this in its
+**internal MCU flash** (D70F3433), NOT in the 95320 EEPROM. This is the
+car-level check — the outer checksum across all modules.
+
+**Layer 2 — The IKA Key (DID `0x00BE` on each module, 34 bytes):**
+A cryptographic value written to each enrolled module proving it was authorized
+for this VIN. Where this is stored physically (EEPROM vs MCU flash) varies by
+module. This is the module-level check — the inner checksum.
+
+Both layers must pass. Both must be consistent with each other.
+
+### The J533 EEPROM Swap — Why It Only "Suppresses" CP
+
+Community research correctly notes that cloning J533's 95320 EEPROM suppresses
+CP faults but doesn't permanently fix them. The reason is now understood:
+
+The 95320 EEPROM on J533 holds configuration data — coding, adaptations, bus
+topology. The cryptographic constellation lives in the D70F3433 MCU's internal
+flash, which is NOT cloned by an EEPROM swap. The EEPROM swap fools the
+configuration layer but leaves the cryptographic layer intact.
+
+Result: The gateway loads the cloned config and stops displaying CP faults in
+some contexts, but the underlying MCU still validates module serials against its
+original constellation. On ignition cycles and deeper diagnostic scans, the real
+MCU constellation takes precedence.
+
+### The Slave Module EEPROM Swap — When It Actually Works
+
+For slave modules (J255, J136, etc.), the EEPROM swap logic is different:
+
+**Scenario: Clone the ENROLLED unit's EEPROM into a replacement unit.**
+
+If J255's IKA key (DID `0x00BE`) lives in its external EEPROM (not MCU flash),
+then cloning the enrolled unit's EEPROM gives the replacement:
+- The enrolled unit's serial number (presented to J533) — Layer 1 ✓
+- The enrolled unit's IKA key — Layer 2 ✓
+
+This works as long as:
+1. The IKA key is in the external EEPROM (not all modules store it there)
+2. Only one unit with that EEPROM is ever connected at a time
+3. The module variant and hardware revision are compatible
+4. J533 hasn't already blacklisted the serial
+
+**The C7 complication:** On the 2013+ Lear platform, it is not confirmed whether
+J255's IKA key lives in its external EEPROM or its MCU flash. If it is MCU flash,
+the EEPROM swap changes the presented serial number (affecting Layer 1) without
+changing the IKA key (Layer 2 unchanged). This can make things worse, not better.
+
+### The UDS Write Path — Strictly Better Than EEPROM Swap
+
+When OBD access is available (which it is on the C7 platform), the UDS write
+path is cleaner than physical EEPROM surgery:
+
+- `WriteDataByIdentifier(0x00BE, <34-byte IKA blob>)` writes the key wherever
+  the module firmware stores it — EEPROM or MCU flash, the UDS layer abstracts it
+- Then updating J533's constellation DID `0x04A3` handles Layer 1
+- No soldering, no chip risk, no physical access to the module
+
+The EEPROM swap is a workaround for when software access is unavailable. On C7
+platforms with OBD access, it is the inferior approach.
+
+### Summary Table
+
+| Approach | Layer 1 (constellation) | Layer 2 (IKA key) | Works on C7? |
+|----------|------------------------|-------------------|--------------|
+| J533 EEPROM clone | ✗ MCU flash unchanged | N/A | No — suppresses only |
+| Slave EEPROM clone (enrolled→replacement) | ✓ if serial matches | ✓ if key in EEPROM | Maybe — unknown if key in EEPROM |
+| UDS WriteDataByIdentifier(0x00BE) | Requires separate step | ✓ Confirmed path | Yes — clean |
+| UDS + constellation update (0x04A3) | ✓ | ✓ | Yes — complete fix |
+| ABRITES VN020 (local EEPROM derivation) | ✓ if supported | ✓ | Unknown C7 coverage |
+
+*The confirmed IKA key blob for VIN WAUGGAFC7DN120188 (from Feb 2024 ODIS session):*
+```
+E6 2B 41 D1 1C 44 AF 20 21 77 FB 1F 27 4B 0A C2
+D1 5B D2 62 E4 FD 27 AB 61 D1 23 C2 F1 5A 2C 93 26 00
+```
+*Whether this blob is the same across all enrolled modules (VIN-bound) or unique
+per module (module-bound) is the critical open question. See
+`j533-constellation-deep-dive.md` — hardware test pending.*
+
 
 ## Sources
 - AudiEnthusiasts.com — MMI EEPROM map (audienthusiasts.com/Infotainment_EEPROM.html)
