@@ -619,7 +619,7 @@ by running `dumpMWB.py` natively on Linux using the open-source PBL library. See
 | ECU Name code for J255 | ✓ Confirmed: `8` (Air Conditioning) from `0x2A2A` TEXTTABLE |
 | IKA/GKA key DID addresses on J255 | ✓ Confirmed: `0x00BE` (IKA), `0x00BD` (GKA), 34 bytes each |
 | Security access level for CP writes | ✓ Confirmed: None required — extended session only, GEKO token provides auth |
-| Routine ID bytes for `RoutiContrStartRoutiCompoProte` | ✗ Still open — in `ES_LIBCompoProteGen3V12.sd.db` |
+| Routine ID bytes for `RoutiContrStartRoutiCompoProte` | ✓ Confirmed: **`0x0226`** — extracted from `ES_LIBCompoProteGen3V12.sd.db` binary, pending live hardware confirmation |
 
 ---
 
