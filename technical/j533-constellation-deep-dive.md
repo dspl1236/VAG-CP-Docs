@@ -638,7 +638,7 @@ by running `dumpMWB.py` natively on Linux using the open-source PBL library. See
 
 *The theoretical model described above was written from behavioral observation and
 community research. The following section upgrades it to confirmed from a real
-ODIS CP removal session captured on VIN `WAUGGAFC7DN120188` — a 2013 Audi A6 C7,
+ODIS CP removal session captured on VIN `WAUGGA**********8` — a 2013 Audi A6 C7,
 3.0T TFSI CGWB, built Neckarsulm.*
 
 *Full session analysis: `technical/odis-cp-session-wauggafc7dn120188.md`*
@@ -781,7 +781,7 @@ From the session log, before contacting GEKO, ODIS collected these values:
 
 | Source | DID | Value |
 |--------|-----|-------|
-| VIN (from J518) | F190 | `WAUGGAFC7DN120188` |
+| VIN (from J518) | F190 | `WAUGGA**********8` |
 | J518 FAZIT | F17C | `HLH-W41 21.02.13 1003 1126` |
 | J518 HW number | F191 | `4H0907064CR` |
 | J533 FAZIT | F17C | `LAK-000 22.02.13 2009 7162` |
