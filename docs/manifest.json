@@ -1,0 +1,9 @@
+{
+  "name": "VAG-CP Tool",
+  "short_name": "VAG-CP",
+  "description": "Component Protection diagnostic tool for VAG vehicles",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#07090a",
+  "theme_color": "#0a0f0a"
+}
