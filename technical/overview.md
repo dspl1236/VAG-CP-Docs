@@ -117,7 +117,7 @@ To remove Component Protection, a technician must:
 | IKA key DID | `0x00BE` (34 bytes) | ✓ Confirmed from live ODIS session |
 | GKA key DID | `0x00BD` (34 bytes) | ✓ Confirmed from AU57X MWB extraction |
 | Constellation DID | `0x04A3` (10 bytes) | ✓ Before/after captured from live session |
-| GEKO server | Immobilizer/CP endpoint **OFFLINE** | ✓ Confirmed status.vw-geko.com March 2026 |
+| GRP server | Operational — but IMMO/CP **withheld from third parties by design** | ✓ Confirmed status.vw-geko.com March 2026 |
 | VW CA Root cert | 4096-bit RSA, SHA384, valid 2023–2033 | ✓ Extracted from ODIS DMS keystore |
 | GEKO server cert | 2048-bit RSA, self-signed, valid 2023–2033 | ✓ Extracted from ODIS DMS keystore |
 
