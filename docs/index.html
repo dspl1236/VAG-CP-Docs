@@ -402,7 +402,16 @@ function sendFrame(txId, rxId, udsBytes) {
   const pkt = new Uint8Array(HDR_SZ + udsBytes.length);
   pkt.set(hdr, 0);
   pkt.set(udsBytes, HDR_SZ);
-  return writeChar.writeValueWithoutResponse(pkt);
+  // Use writeValue (with response) — more reliable on Android + ESP32
+  // Falls back to writeValueWithoutResponse if not supported
+  try {
+    return await writeChar.writeValue(pkt);
+  } catch(e) {
+    if (e.name === 'NotSupportedError' || e.message.includes('without response')) {
+      return await writeChar.writeValueWithoutResponse(pkt);
+    }
+    throw e;
+  }
 }
 
 function onNotify(evt) {
@@ -484,7 +493,7 @@ async function handleScan() {
 
     // ★ KEY FIX: wait for BLE stack to stabilise after startNotifications
     log('BLE stack settling…');
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 1500));
     notifyReady = true;
 
     log(`Connected: ${bleDevice.name}`, 'ok');
@@ -517,7 +526,7 @@ async function ensureConnected() {
   ntfyChar   = await svc.getCharacteristic(CHAR_NTFY);
   ntfyChar.addEventListener('characteristicvaluechanged', onNotify);
   await ntfyChar.startNotifications();
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise(r => setTimeout(r, 1500));
   notifyReady = true;
   log('Reconnected', 'ok');
 }
@@ -573,7 +582,7 @@ async function runIKARead() {
       document.getElementById(`mst-${mod.name}`).textContent='ERROR';
       log(`${mod.name}: ${e.message}`, 'err');
     }
-    await new Promise(r => setTimeout(r, 400)); // small gap between modules
+    await new Promise(r => setTimeout(r, 600)); // gap between modules
   }
 
   // Result analysis
@@ -596,7 +605,10 @@ async function runIKARead() {
   } else {
     banner.className='scenario-c';
     banner.textContent='◈ ALL READS FAILED — CHECK CONNECTION';
-    log('No successful reads — check ESP32 is in OBD port and car is on', 'err');
+    log('All reads failed. Checklist:', 'err');
+    log('1. Ignition ON (key in, engine not required)', 'warn');
+    log('2. ESP32 firmly seated in OBD port', 'warn');
+    log('3. Try from HTTPS: dspl1236.github.io/VAG-CP-Docs', 'warn');
   }
 
   // Export text
