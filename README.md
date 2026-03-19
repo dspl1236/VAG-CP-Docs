@@ -111,8 +111,7 @@ When a replacement part is installed — even a perfectly functional, identical
 salvage part — it will not work until a Volkswagen Group dealer uses proprietary
 ODIS software to perform an online authentication with VW's GEKO/GRP servers.
 
-**The GEKO Immobilizer/Component Protection endpoint has been offline since at
-least early 2026 with no estimated return date for any VAG brand.**
+**VW has migrated to a new backend system called **GRP (Group Retail Portal)**. GRP is fully operational — but access to Immobilizer and Component Protection functions has been **deliberately withheld from third-party tools and independent repair shops**. This is not a server outage. It is an intentional architectural choice to exclude independent repair from the new system by design.**
 
 The result: A $200 salvage part requires an additional $300–$500 dealer fee just
 to be activated — when it can be activated at all. Independent repair is
@@ -165,12 +164,11 @@ from the owner to the manufacturer's server infrastructure.
 
 ## Why does this matter?
 
-### 1. The GEKO server is offline — vehicles cannot be serviced
+### 1. VW's new GRP system deliberately excludes independent repair
 
-Component Protection requires a live connection to VW's backend servers to activate
-any replacement module. The GEKO Immobilizer/CP endpoint has been offline since at
-least early 2026 with no ETA. **With GEKO down, even dealers cannot clear CP.**
-This is not a temporary inconvenience — it is a preview of permanent server sunset.
+Component Protection requires a live connection to VW's backend servers to activate any replacement module. VW has migrated from the legacy GEKO system to GRP (Group Retail Portal). GRP is live and operational — dealers can use it. However, **Immobilizer and Component Protection access has been explicitly withheld from third-party tools and independent repair shops in GRP's design.**
+
+This is the critical distinction: GEKO going offline could be characterised as a temporary migration issue. GRP launching *without* independent repair access is a deliberate policy decision. VW chose, when designing the replacement system, not to include independent repair. That choice is what legislators and regulators can and should respond to.
 
 ### 2. The system triggers without any parts being changed
 
@@ -223,8 +221,7 @@ VW is migrating backend authentication from legacy GEKO to GRP (Group Retail Por
 ODIS 25.x uses GRP; ODIS 23.x and earlier use GEKO. The GEKO Immobilizer/CP endpoint
 is currently offline for all brands with no ETA.
 
-**For 2016+ vehicles, server dependency is absolute.** When servers go dark
-permanently, those modules go permanently locked.
+**For 2016+ vehicles, server dependency is absolute.** VW has now built the replacement infrastructure and explicitly excluded independent repair from it. This is no longer a question of whether servers will stay up — it is a question of whether VW can legally maintain a monopoly on repair access through software architecture.
 
 This is the core urgency of this documentation project.
 
