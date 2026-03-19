@@ -34,7 +34,7 @@
 ### Resolution attempt
 
 **Unlock status:** Unresolved at time of submission  
-**Server status:** GEKO Immobilizer/CP endpoint **OFFLINE** as of March 2026, no ETA given by VW for all brands  
+**Server status:** VW has migrated to GRP (Group Retail Portal). GRP is operational for dealers. Immobilizer/CP access has been **deliberately withheld from third-party tools in GRP's design** — this is an architectural policy choice, not a temporary outage.  
 **Dealer option:** Available but requires $300–$500+ per module in unlock fees, on top of cost of donor vehicle already purchased
 
 **Notable:** Owner purchased an entire second Audi A6 specifically to source OEM-identical salvage parts for cost-effective repair. Despite having perfect, matching donor parts, both modules are non-functional due to Component Protection. The total cost of acquiring the donor vehicle plus dealer CP removal fees approaches or exceeds the cost of purchasing new OEM parts — entirely defeating the purpose of the repair strategy.
