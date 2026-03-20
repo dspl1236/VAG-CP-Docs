@@ -161,6 +161,13 @@ const CW   = '0000abf1-0000-1000-8000-00805f9b34fb';
 const CN   = '0000abf2-0000-1000-8000-00805f9b34fb';
 const H_ID = 0xF1;
 const H_SZ = 8;
+
+// ── Transport auto-detection ─────────────────────────────────────────
+// Loaded from ESP32 (192.168.4.1 / funkbridge.local) → WebSocket
+// Loaded from GitHub Pages or any other origin → BLE
+const WS_HOSTS = ['192.168.4.1','funkbridge.local','funkbridge'];
+const USE_WIFI = WS_HOSTS.some(h=>location.hostname===h);
+const WS_URL   = USE_WIFI ? 'ws://'+location.hostname+'/ws' : null;
 const KNOWN = 'e62b41d11c44af202177fb1f274b0ac2d15bd262e4fd27ab61d123c2f15a2c932600';
 
 const MODS = [
@@ -172,8 +179,9 @@ const MODS = [
   {n:'J136',d:'Mem.Seat',   tx:0x714,rx:0x77C},
 ];
 
-// ── BLE state ──────────────────────────────────────────────────────────────
-let gDev=null, gSrv=null, gWc=null, gNc=null;
+// ── Transport state ─────────────────────────────────────────────────────────
+let gDev=null, gSrv=null, gWc=null, gNc=null; // BLE
+let gWs=null;                                   // WiFi WebSocket
 let rxQ=[], rxR=[];
 
 // ── UI helpers ─────────────────────────────────────────────────────────────
@@ -254,7 +262,6 @@ function wait(ms=7000){
 
 // ── Send a UDS frame ───────────────────────────────────────────────────────
 async function send(txId,rxId,uds){
-  if(!gWc) throw new Error('not connected');
   const hdr=new Uint8Array(H_SZ);
   const dv=new DataView(hdr.buffer);
   dv.setUint8(0,H_ID); dv.setUint8(1,0);
@@ -262,11 +269,14 @@ async function send(txId,rxId,uds){
   dv.setUint16(6,uds.length,true);
   const pkt=new Uint8Array(H_SZ+uds.length);
   pkt.set(hdr); pkt.set(uds,H_SZ);
-  // v1.03 firmware uses write-without-response characteristic
-  // Try without-response first, fall back to with-response
-  try {
+  if(USE_WIFI){
+    if(!gWs||gWs.readyState!==WebSocket.OPEN) throw new Error('WebSocket not connected');
+    gWs.send(pkt); return;
+  }
+  if(!gWc) throw new Error('BLE not connected');
+  try{
     await gWc.writeValueWithoutResponse(pkt);
-  } catch(e) {
+  }catch(e){
     await gWc.writeValue(pkt);
   }
 }
@@ -296,6 +306,10 @@ async function rdid(tx,rx,did){
 
 // ── Auto-reconnect ─────────────────────────────────────────────────────────
 async function ensureConn(){
+  if(USE_WIFI){
+    if(gWs&&gWs.readyState===WebSocket.OPEN) return;
+    throw new Error('WiFi disconnected — tap DISC then CONNECT again');
+  }
   if(gSrv&&gSrv.connected&&gWc) return;
   if(!gDev) throw new Error('no device');
   lg('Reconnecting…','w');
@@ -313,6 +327,42 @@ function delay(ms){return new Promise(r=>setTimeout(r,ms));}
 
 // ── Connect ────────────────────────────────────────────────────────────────
 async function doScan(){
+  if(USE_WIFI){
+    setUI('ing');
+    lg('Connecting to FunkBridge WebSocket…','h');
+    try{
+      gWs=new WebSocket(WS_URL);
+      gWs.binaryType='arraybuffer';
+      await new Promise((res,rej)=>{
+        gWs.onopen=()=>res();
+        gWs.onerror=()=>rej(new Error('WebSocket failed'));
+        setTimeout(()=>rej(new Error('timeout')),8000);
+      });
+      gWs.onmessage=(evt)=>{
+        const raw=new Uint8Array(evt.data);
+        let off=0;
+        while(off<raw.length){
+          if(raw[off]!==H_ID){off++;continue;}
+          if(off+H_SZ>raw.length) break;
+          const v=new DataView(raw.buffer,off);
+          const sz=v.getUint16(6,true);
+          off+=H_SZ;
+          if(off+sz>raw.length) break;
+          const pay=Array.from(raw.slice(off,off+sz));
+          off+=sz;
+          if(rxR.length>0) rxR.shift()(pay);
+          else rxQ.push(pay);
+        }
+      };
+      gWs.onclose=()=>{lg('WebSocket closed','w');setUI('off');gWs=null;};
+      lg('Connected via WiFi ✓','ok');
+      setUI('on','FunkBridge (WiFi)');
+    }catch(e){
+      lg('WiFi connect failed: '+e.message,'er');
+      setUI('off');
+    }
+    return;
+  }
   if(!navigator.bluetooth){
     alert('Web Bluetooth not available.\n\nUse Chrome and open:\nhttps://dspl1236.github.io/VAG-CP-Docs/\n\nAlso enable Location permission for Chrome.');
     return;
@@ -346,7 +396,12 @@ async function doScan(){
 }
 
 async function doDisc(){
-  if(gDev&&gDev.gatt.connected) gDev.gatt.disconnect();
+  if(USE_WIFI){
+    if(gWs) gWs.close();
+    gWs=null;
+  } else {
+    if(gDev&&gDev.gatt.connected) gDev.gatt.disconnect();
+  }
   setUI('off');
 }
 
@@ -517,9 +572,17 @@ async function runCP(){
 
 // ── Init ───────────────────────────────────────────────────────────────────
 buildGrid();
-if(!window.isSecureContext) document.getElementById('warn').style.display='block';
-lg('VAG-CP Tool v4 ready','ok');
-if(!navigator.bluetooth) lg('Web Bluetooth not detected — use Chrome','er');
+if(USE_WIFI){
+  document.getElementById('bscan').textContent='⟳ CONNECT (WiFi)';
+  document.getElementById('warn').style.display='none';
+  lg('VAG-CP Tool v6 — WiFi mode ('+location.hostname+')','ok');
+  lg('Tap CONNECT to open WebSocket to ESP32','h');
+}else{
+  if(!window.isSecureContext) document.getElementById('warn').style.display='block';
+  lg('VAG-CP Tool v6 — BLE mode','ok');
+  if(!navigator.bluetooth) lg('Web Bluetooth not detected — use Chrome','er');
+  else lg('Tap SCAN & CONNECT to find ESP32','h');
+}
 </script>
 </body>
 </html>
