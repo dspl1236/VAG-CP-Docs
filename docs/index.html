@@ -262,11 +262,12 @@ async function send(txId,rxId,uds){
   dv.setUint16(6,uds.length,true);
   const pkt=new Uint8Array(H_SZ+uds.length);
   pkt.set(hdr); pkt.set(uds,H_SZ);
-  // Try write with response first (more reliable on Android)
+  // v1.03 firmware uses write-without-response characteristic
+  // Try without-response first, fall back to with-response
   try {
-    await gWc.writeValue(pkt);
-  } catch(e) {
     await gWc.writeValueWithoutResponse(pkt);
+  } catch(e) {
+    await gWc.writeValue(pkt);
   }
 }
 
