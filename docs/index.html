@@ -160,7 +160,7 @@ const SVC  = '0000abf0-0000-1000-8000-00805f9b34fb';
 const CW   = '0000abf1-0000-1000-8000-00805f9b34fb';
 const CN   = '0000abf2-0000-1000-8000-00805f9b34fb';
 const CC   = '0000abf3-0000-1000-8000-00805f9b34fb'; // CMD characteristic
-const BLE_PASSWORD = 'BLE2';  // v1.03+ firmware default password
+// BLE password 'BLE2' is the Switchleg v1.03 default — sent automatically
 const H_ID = 0xF1;
 const H_SZ = 8;
 
@@ -405,7 +405,7 @@ async function bleAuth(){
   if(!gCc) return;
   try{
     // FLAG_SETTINGS=0x80, SETTING_PASSWORD=7, then password bytes
-    const pw = new TextEncoder().encode(BLE_PASSWORD);
+    const pw = new TextEncoder().encode('BLE2'); // Switchleg v1.03 default
     const payload = new Uint8Array([0x80, 0x07, ...pw]);
     await gCc.writeValueWithoutResponse(payload);
     await new Promise(r=>setTimeout(r,300));
