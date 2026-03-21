@@ -159,6 +159,8 @@ textarea#ea{background:var(--bg);border:1px solid var(--bdr);border-radius:3px;p
 const SVC  = '0000abf0-0000-1000-8000-00805f9b34fb';
 const CW   = '0000abf1-0000-1000-8000-00805f9b34fb';
 const CN   = '0000abf2-0000-1000-8000-00805f9b34fb';
+const CC   = '0000abf3-0000-1000-8000-00805f9b34fb'; // CMD characteristic
+const BLE_PASSWORD = 'BLE2';  // v1.03+ firmware default password
 const H_ID = 0xF1;
 const H_SZ = 8;
 
@@ -180,7 +182,7 @@ const MODS = [
 ];
 
 // ── Transport state ─────────────────────────────────────────────────────────
-let gDev=null, gSrv=null, gWc=null, gNc=null; // BLE
+let gDev=null, gSrv=null, gWc=null, gNc=null, gCc=null; // BLE (gCc=CMD char)
 let gWs=null;                                   // WiFi WebSocket
 let rxQ=[], rxR=[];
 
@@ -383,15 +385,32 @@ async function doScan(){
     const s=await gSrv.getPrimaryService(SVC);
     gWc=await s.getCharacteristic(CW);
     gNc=await s.getCharacteristic(CN);
+    gCc=await s.getCharacteristic(CC);
     gNc.addEventListener('characteristicvaluechanged',onNtfy);
     await gNc.startNotifications();
     lg('Notifications subscribed, settling…');
     await delay(1200);
+    // Authenticate with v1.03+ firmware (FLAG_SETTINGS|SETTING_PASSWORD + 'BLE2')
+    await bleAuth();
+    lg('BLE auth sent ✓');
     lg('Connected: '+gDev.name,'ok');
     setUI('on',gDev.name);
   }catch(e){
     lg('Connect failed: '+e.message,'er');
     setUI('off');
+  }
+}
+
+async function bleAuth(){
+  if(!gCc) return;
+  try{
+    // FLAG_SETTINGS=0x80, SETTING_PASSWORD=7, then password bytes
+    const pw = new TextEncoder().encode(BLE_PASSWORD);
+    const payload = new Uint8Array([0x80, 0x07, ...pw]);
+    await gCc.writeValueWithoutResponse(payload);
+    await new Promise(r=>setTimeout(r,300));
+  }catch(e){
+    lg('Auth note: '+e.message,'w'); // non-fatal — older firmware has no password
   }
 }
 
@@ -401,6 +420,7 @@ async function doDisc(){
     gWs=null;
   } else {
     if(gDev&&gDev.gatt.connected) gDev.gatt.disconnect();
+    gCc=null;
   }
   setUI('off');
 }
