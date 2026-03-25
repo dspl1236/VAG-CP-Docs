@@ -50,7 +50,7 @@ service information, and records of documented consumer harm.
   information about security systems for purposes of education, research, and
   advocacy is protected even when the information is detailed.
 
-- **Oregon SB 1596 (2024) and Colorado HB 1121 (2026)** — Both states have
+- **Oregon SB 1596 (2024) and Colorado HB 1121 (enacted 2024, effective January 1, 2025)** — Both states have
   enacted laws prohibiting software-based parts pairing of the kind Component
   Protection implements. This documentation supports compliance and enforcement.
 
@@ -182,7 +182,7 @@ creating a captive repair market by software design.
 
 ### 4. It may violate consumer protection law
 
-Oregon's SB 1596 (2024) and Colorado's HB 1121 (effective 2026) ban software-based
+Oregon's SB 1596 (2024) and Colorado's HB 1121 (enacted 2024, effective January 1, 2025) ban software-based
 parts pairing. The FTC has identified software locks as anticompetitive. The federal
 REPAIR Act would prohibit the dealer-exclusive access CP requires.
 

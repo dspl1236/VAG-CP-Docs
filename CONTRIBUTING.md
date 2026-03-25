@@ -54,6 +54,8 @@ When submitting a case, please include as much of the following as you're comfor
 - No instructions for circumventing security systems
 - All contributions are released under CC0 (public domain)
 
+**VIN handling:** Filenames may contain partial VIN-derived identifiers (e.g., the last six characters of a VIN) to support research reproducibility and cross-referencing of related documents. Within document text, VINs should be redacted to prevent identification of individual vehicles (e.g., `WAUGGAFC*********` or similar masking).
+
 ---
 
 ## Opening a Pull Request

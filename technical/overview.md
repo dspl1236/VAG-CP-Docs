@@ -56,7 +56,7 @@ Component Protection is documented to activate in the following scenarios:
 
 ## Three generations + SFD overlay
 
-See `generations.md` for full detail. Summary:
+The generation details are summarized in the comparison table below.
 
 | Generation | Years | Workaround |
 |---|---|---|
