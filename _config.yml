@@ -1,0 +1,49 @@
+title: VAG Component Protection — Right to Repair Documentation
+description: >
+  Open documentation of Volkswagen Group Component Protection:
+  how it works, which modules are affected, and what vehicle owners
+  and independent repairers need to know.
+baseurl: "/VAG-CP-Docs"
+url: "https://dspl1236.github.io"
+
+# Theme
+remote_theme: pages-themes/primer@v0.2.0
+plugins:
+  - jekyll-remote-theme
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-readme-index
+  - jekyll-default-layout
+  - jekyll-titles-from-headings
+
+# Include all markdown files
+include:
+  - advocacy
+  - cases
+  - technical
+  - media
+
+# Exclude non-doc files
+exclude:
+  - LICENSE
+  - CONTRIBUTING.md
+  - "*.pem"
+
+# Relative links
+relative_links:
+  enabled: true
+  collections: true
+
+# Readme index
+readme_index:
+  enabled: true
+
+# Titles from headings
+titles_from_headings:
+  enabled: true
+  strip_title: true
+
+# Optional front matter
+optional_front_matter:
+  enabled: true
+  remove_originals: false
