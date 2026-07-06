@@ -1,0 +1,101 @@
+## Definitions 
+
+Tier 1 is expanded or unambiguously defined somewhere in the repo's own text Tier 2 is used constantly but never spelled out on the technical files — those expansions are supplied from general automotive-diagnostic/VAG knowledge and should be verified.
+
+### Tier 1 — Defined or confirmed in-repo
+
+**CP** = Component Protection (German: *Komponentenschutz*) — VW Group's software-based parts-pairing/anti-tampering system, distinct from the immobilizer, that restricts module *functionality* when a module's identity doesn't match its enrolled vehicle.
+
+**FAZIT** = *Fahrzeug-Informations und Zentrales Identifikations-Tool* — VW's central authorization database, physically located at Audi AG, Ingolstadt, that approves or blocks module-to-VIN pairing.
+
+**GEKO** = VW's legacy CP/Immobilizer backend server (mutual-TLS, used by ODIS 23.x and earlier); now offline for IMMO/CP endpoints as of the documents' most recent dates.
+
+**GRP** = Group Retail Portal — VW's current backend (used by ODIS 25.x); operational for dealers, with IMMO/CP access deliberately withheld from third-party tools.
+
+**ODIS** = Offboard Diagnostic Information System — VW's proprietary dealer diagnostic platform. Has two variants referenced: **ODIS-S** (Service) and **ODIS-E**/**ODIS Engineering**.
+
+**MCD** = *Multi-Client Diagnostics* — explicitly spelled out in `au57x-mcd-project-findings.md`: "The ODIS MCD (Multi-Client Diagnostics) project... is the complete diagnostic definition used by ODIS when connected to a vehicle."
+
+**IKA** = *Installationsschlüssel* (installation key) — the 34-byte per-module credential at DID `0x00BE`, also labeled "Komponentenschutzschlüssel" in MWB output. Confirmed expansion in `au57x-mcd-project-findings.md`.
+
+**GFA** = *Geräteinzelfreigabe* (individual device release/authorization) — the key downloaded alongside IKA, confirmed in `au57x-mcd-project-findings.md` and `j533-constellation-deep-dive.md`.
+
+**GKA** = *Geräteklassenfreigabe* (device class release/authorization) — the 34-byte key at DID `0x00BD`. Note: the AU57X adaptation dump itself labels this DID's description string "GFA-Schlüssel," which is inconsistent with the GKA naming used in the surrounding service identifiers (`TABROW_GKAKey`) — this naming inconsistency exists in VW's own data, not introduced here.
+
+**DID** = Diagnostic Identifier — a UDS-addressable parameter (`0x00BE`, `0x04A3`, etc.), read via service `0x22` and written via `0x2E`.
+
+**DOP** = Data Object Parameter — explicitly named in `au57x-mwb-extraction-confirmed-dids.md`: "DOP (Data Object Parameter) for GatewCompoList."
+
+**SVM** = Software Version Management — confirmed in `cp-master-module.md` as an ODIS-S engineering function ("Perform SVM (Software Version Management) coding").
+
+**DMS** = Dealer Management System — the dealer-side GEKO client whose keystores were analyzed in `geko-pki-analysis.md`.
+
+**mTLS** = Mutual TLS — the two-way certificate authentication GEKO uses between dealer tool and server.
+
+**JKS** = Java KeyStore — file format of `dms_trust.keystore` / `dms_client.keystore`.
+
+**PBL** = Persistent Block Library — the open-source (MIT) C library `pbl.dll` is compiled from; used to parse ODIS's `.bv.db` files. Recompiling it for Linux is the basis of the repo's MWB-extraction breakthrough.
+
+**ODX** = Open Diagnostic eXchange — explicitly defined in `j533-constellation-deep-dive.md`'s file-type table: "`.odx` | Open Diagnostic eXchange — XML format."
+
+**PDX** = Packed ODX container — confirmed in `obd-tools-uds-protocol-esp32.md`: "`.pdx` files — packed ODX containers."
+
+**FRF** = Flash Record File — defined in `j533-constellation-deep-dive.md`'s file-type table as "ECU firmware binary."
+
+**SGO** = Flash container format, described (not acronym-expanded) in the same table as "Flash container (compressed) — contains .frf or .pdx."
+
+**BV / EV** = ECU Base Variant / ECU Variant — confirmed from the protocol-path notation itself in `j533-constellation-deep-dive.md` and `au57x-mcd-project-findings.md`: `[EcuBaseVariant]BV_GatewUDS`, `[EcuVariant]EV_GatewPKOUDS_001`.
+
+**TWAI** = Two-Wire Automotive Interface — explicitly expanded in `obd-tools-uds-protocol-esp32.md` for the ESP32's built-in CAN-compatible controller.
+
+**VCID** = Vehicle Component Identification (string) — explicitly defined in `j533-constellation-deep-dive.md` as EEPROM-stored gateway data.
+
+**qconn** = QNX's remote-debug agent process, identified inline as a comment in `cp-offline-resolution.md` ("Starts the QNX remote debug agent") — not a true acronym but a named tool.
+
+**J533** = Data Bus On-Board Diagnostic Interface (CAN Gateway) — the master CP enforcement/bookkeeping module; per SSP 994403, the module "integrated into the Component Protection function for the first time."
+
+**J518** = Access/Start Control Module (Kessy) — documented immobilizer master, interlocked with but distinct from CP.
+
+**Constellation** = The repo's term for DID `0x04A3`'s bitmap recording which module slots are enrolled — described and reverse-engineered at length as a static bookkeeping record, not itself a cryptographic check (see `j533-cp-verification-cipher.md`'s "Layer 1 / Layer 2" model).
+
+**Two-Layer Model** = The repo's own framework, defined identically across `j533-constellation-deep-dive.md`, `community-research-eeprom.md`, and `j533-cp-verification-cipher.md`: Layer 1 = the constellation (car-level, J533), Layer 2 = the IKA key (module-level, per-component).
+
+### Tier 2 — Used throughout but never expanded anywhere in the 19 files (verify independently)
+
+**MWB** — Likely *Messwertblock* (German automotive-diagnostic convention for "measured-value block") based on general VAG terminology — should be treated as an open item exactly like the routine-ID gaps the repo itself flags.
+
+**SFD** — Likely *Schreibfreischaltung* (German: "write enable/release"), a known VAG term for the post-2020 write-authorization overlay — unverified against this repo's own text.
+
+**ASAM** = Association for Standardization of Automation and Measuring Systems — the standards body behind the dataset-naming convention (`EV_*`, `BV_*`, `0xF19E` "ASAM dataset"). Standard industry knowledge, not defined in-repo.
+
+**NRC** = Negative Response Code — ISO 14229 standard term used constantly (`0x31`, `0x33`, `0x78`, etc.) without definition in-repo.
+
+**KWP2000** = Keyword Protocol 2000 — a legacy VAG sub-bus diagnostic protocol named throughout, not expanded.
+
+**ISO-TP** = ISO Transport Protocol (ISO 15765-2) — the CAN framing layer UDS runs over.
+
+**SID** = Service Identifier —  meaning is contextually obvious (`0x10`, `0x22`, `0x27`...).
+
+**SA2** = Security Access level 2 — the `0x27` seed/key challenge gating certain writes.
+
+**SKC** = Secret Key Code — vehicle-specific 5-digit input to the "diagnostic SA2" derivation, distinct from the documented flash-programming SA2 algorithm.
+
+**FSC** =  Likely related to feature/license licensing on the infotainment unit, but this is a guess; treat as unresolved.
+
+**DIDB** — "AU57X DIDB diagnostic database — contextually a DID/fault-code database, not expanded.
+
+**IDE** — used as ODIS adaptation-channel identifiers; never expanded.
+
+**MAS** — explicitly glossed only as "(Measurement)" likely corresponds to VCDS measurement-block group numbers (e.g. `MAS00049`).
+
+**COP** —  contextually tied to component-protection identity reads on KWP sub-buses.
+
+**VFB** — **not clear**: `j533-constellation-deep-dive.md` line 36 calls it "V850 Fetch Bus (VFB)," then line 413 of the same file calls it "V850 VFB (Velocity Fetch Bus)."
+
+**DVR** — ODIS project/revision versioning, never expanded.
+
+**EZS** — "EZS-Kessy" — standard VAG abbreviation for *Elektronische Zündstartschalter* (electronic ignition/start switch).
+
+**TP2.0 / TP1.6** — VW's proprietary Transport Protocol generations for sub-bus communication.
+
+**DoIP** — "CAN FD and DoIP support" (VNCI tool capability) — Diagnostics over IP, standard automotive term.
