@@ -10,7 +10,7 @@ A running list of press coverage, articles, forum threads, and videos documentin
 
 - [Volkswagen's Component Locking Makes Home Repairs Too Expensive To Be Feasible](https://www.jalopnik.com/2122451/volkswagen-component-locking-home-repair-impossible/) — Jalopnik, March 14, 2026. Overview of CP's impact on DIY repair economics; mentions $300–$500 unlock fees.
 
-- [You Don't Own Your Car: How "Component Locking" is Killing Your Right to Repair](https://www.gadgetreview.com/you-dont-own-car-how-component-locking-is-killing-your-right-to-repair) — Gadget Review, 2025. Documents the used parts economic trap.
+- [The Right to Repair Won the Hardware War. The Software War Is Just Starting](https://calder-brief.pages.dev/opinion-repair-software-war-october-2026.html) — Calder Brief, October 2026. On parts pairing, activation locks, and post-repair warnings — the software locks defeating repair.
 
 - [How automakers are quietly locking drivers out of their own cars](https://www.cbtnews.com/automakers-lock-drivers-out-of-their-cars/) — CBT News. Names VW Group's Component Protection specifically.
 
