@@ -88,9 +88,25 @@ property of RSA signatures. A public modulus is a *verification* key: recovering
 **both** stock signatures (the 724 KB application block and the 2 KB RAM driver block),
 independently confirming the scheme above.
 
-> The recovered modulus value itself is a public key and harmless, but it is held in the
-> research set rather than printed here — consistent with this project's stated scope:
-> mechanism and findings, not proprietary material or turnkey bypass tooling.
+The recovered modulus is printed here so the finding above is **independently checkable** — a
+reader can confirm for themselves that the stock signatures verify under it. It is a *public*
+verification key: it lets you **check** signatures, **not** forge them (a forgery needs the
+private key, which RSA-1024 keeps out of reach, or a non-conformant verifier — see §3). The
+same GCD method recovers the other per-ECU moduli; the C7 Climatronic is the worked example
+here.
+
+**C7 Climatronic `4G0820043` — public modulus `N` (RSA-1024, `e = 3`):**
+
+```
+bc3f4d39078b9e91a275e535cc96bb5e0960e7758dc9195d654a7180278d8b2d
+3e832d7a808c551fbcde7c67cd4594447d6c05858340c1d9ccf9c4648a230b82
+43cb302baae0c7beaf70889d11c6878f14a9918439797fe983d838e274c5af1b
+f186e0592cc12ee6d35b215c1cfad92aac1e128da094b7cad82c1b67516ddf61
+```
+
+Publishing a verification key is standard for reproducible security research — it is exactly
+what lets a reader audit the claim. The forgery *construction* of §3 is still not published
+here.
 
 ## 3. The one subtlety: `e = 3` and *non-conformant* verifiers
 
