@@ -106,6 +106,6 @@ erasable/CheckMemory-able).
 
 - [`vag-rsa-vs-crc-flash-map.md`](vag-rsa-vs-crc-flash-map.md) — which VAG modules are
   signature-walled vs checksum-only (the seat is checksum; the HVAC is the RSA exception).
-- Flash signatures are **ECU-enforced** (the LEAR/V850 finding): a signed module cannot be
+- Flash signatures are **ECU-enforced** (the [LEAR/V850 finding](flash-signature-enforcement.md)): a signed module cannot be
   OBD-flashed with modified firmware, which is why the HVAC stays bench/oracle-test and the
   seat does not.

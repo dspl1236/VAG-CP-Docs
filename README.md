@@ -207,6 +207,10 @@ VAG-CP-Docs/
 │   ├── cp-master-module.md                      ← J533 as CP master — how enforcement works
 │   ├── cp-offline-resolution.md                 ← Offline resolution decision tree and research plan
 │   ├── gateway-firmware-analysis.md             ← Lear D4 gateway firmware RE — AES tables, CP handler map
+│   ├── vag-rsa-vs-crc-flash-map.md              ← Which modules are signature-walled vs checksum-only
+│   ├── flash-signature-enforcement.md           ← How a signed module enforces the flash signature (ECU-side)
+│   ├── seat-obd-flash.md                        ← Seat CP limp-patch over OBD (checksum-only, worked)
+│   ├── c7-repairability-map.md                  ← C7 module-by-module: patchable / walled / not-CP
 │   ├── live-test-results-20260506.md            ← Live vehicle test — SA2 seed obtained, write path confirmed
 │   └── cp-write-breakthrough-20260506.md        ← **BREAKTHROUGH** — CP write without SA2, full ODIS sequence decoded
 ├── cases/                     ← Documented consumer impact stories

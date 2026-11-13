@@ -56,7 +56,7 @@ carry an unforgeable signature.** Two things the first pass got wrong:
   signature — the bootloaders sit below the flashable region and are in no FRF, so they
   haven't been read. Everything found points to enforcement and nothing points the other
   way. **Plan on enforcement;** a non-destructive on-car test to settle it per module is in
-  the LEAR/V850 signature findings.
+  the [LEAR/V850 signature findings](flash-signature-enforcement.md).
 
 ## The signed set
 
@@ -121,4 +121,4 @@ older radios — is **checksum-only**.
   odx_bytes, methods, rep_frf`. The **`methods`** column lists each representative's
   detected `SECURITY-METHOD` names, so the classification is independently checkable.
 - Signing-scheme detail, the recovered moduli, and the on-car enforcement test: see the
-  LEAR/V850 flash-signature findings.
+  [LEAR/V850 flash-signature findings](flash-signature-enforcement.md).
